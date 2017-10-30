@@ -16,17 +16,14 @@
  */
 package io.dohko.job.resource;
 
-import java.util.List;
-
+import org.excalibur.core.domain.User;
+import org.excalibur.core.execution.domain.Application;
 import org.excalibur.core.execution.domain.ApplicationDescriptor;
+import org.excalibur.core.execution.domain.JobStatus;
 import org.excalibur.core.execution.domain.TaskStats;
 import org.excalibur.core.execution.domain.TaskStatus;
-import org.excalibur.core.execution.domain.repository.TaskCpuStatsRepository;
-import org.excalibur.core.execution.domain.repository.TaskMemoryStatsRepository;
-import org.excalibur.core.execution.domain.repository.TaskStatusRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,57 +32,72 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.google.common.base.Optional;
+import io.dohko.job.batch.JobService;
 
-import io.airlift.command.ProcessCpuState;
-import io.airlift.command.ProcessMemoryState;
+import static java.util.Objects.requireNonNull;
+
+import java.util.ArrayList;
+
+import static com.google.common.base.Preconditions.checkState;
 
 @RestController
-@RequestMapping(value = "/dohko/v1/tasks")
+@RequestMapping(value = "/{username}/jobs")
 public class JobRestController 
 {
-	private final TaskStatusRepository taskStatusRepository;
-	private final TaskCpuStatsRepository taskCpuStatsRepository;
-	private final TaskMemoryStatsRepository taskMemoryStatsRepository;
-	
+	private final JobService service;
 
 	@Autowired
-	public JobRestController(TaskStatusRepository taskStatusRepository, TaskCpuStatsRepository taskCpuStatsRepository, TaskMemoryStatsRepository taskMemoryStatsRepository)
+	public JobRestController(JobService service)
 	{
-		this.taskStatusRepository = taskStatusRepository;
-		this.taskCpuStatsRepository = taskCpuStatsRepository;
-		this.taskMemoryStatsRepository = taskMemoryStatsRepository;
+		this.service = service;
 	}
 		
-	@RequestMapping(value = "", 
-			method = RequestMethod.POST,
-			consumes = {"application/json"},
-            produces = {"application/json"})
+	@RequestMapping(method = RequestMethod.POST, produces = {"application/json"})
 	@ResponseStatus(HttpStatus.CREATED)
-	public ResponseEntity<String> deploy(@RequestBody ApplicationDescriptor descriptor)
+	public @ResponseBody JobStatus create(@PathVariable("username") String user, @RequestBody ApplicationDescriptor job)
 	{
-		return null;
+		requireNonNull(job.getUser(), "job's username is undefined");
+		checkState(user.equals(job.getUser().getUsername()), "job's user and resource's user are different");
+		JobStatus status = service.create(job);
+		return status;
 	}
 	
-	@RequestMapping(value = "/{taskId}/status", 
-			method = RequestMethod.GET, 
-			produces = {"application/json"})
+	@RequestMapping(value = "{jobId}", method = RequestMethod.GET, produces = { "application/json" })
 	@ResponseStatus(HttpStatus.OK)
-	public @ResponseBody TaskStatus status(@PathVariable("taskId") final String taskId)
+	public @ResponseBody ApplicationDescriptor get(@PathVariable("username") String user, @PathVariable("jobId") String jobId)
 	{
-		Optional<TaskStatus> status = taskStatusRepository.getLastStatusOfTask(taskId);
-		return status.orNull();
+		return service.getJob(user, jobId);
 	}
 	
-	@RequestMapping(value = "/{id}/stats", 
-			method = RequestMethod.GET, 
-			produces = {"application/json"})
+	@RequestMapping(value = "/{jobId}/status", method = RequestMethod.GET, produces = { "application/json" })
 	@ResponseStatus(HttpStatus.OK)
-    public @ResponseBody TaskStats stats(@PathVariable("id") final String id)
+	public @ResponseBody JobStatus getJobStatus(@PathVariable("username") String user, @PathVariable("jobId") String jobId)
+	{
+		return service.getJobTaskStatuses(jobId).or(new JobStatus().setId(jobId));
+	}
+	
+	@RequestMapping(value = "/task/{taskId}/status", method = RequestMethod.GET, produces = { "application/json" })
+	@ResponseStatus(HttpStatus.OK)
+	public @ResponseBody TaskStatus status(@PathVariable("username") String user, @PathVariable("taskId") final String taskId)
+	{
+		return service.lastTaskStatus(taskId).orNull();
+	}
+	
+	@RequestMapping(value = "/task/{id}/stats",  method = RequestMethod.GET, produces = {"application/json"})
+	@ResponseStatus(HttpStatus.OK)
+    public @ResponseBody TaskStats stats(@PathVariable("username") String user, @PathVariable("id") final String id)
     {
-		List<ProcessCpuState> cpu = taskCpuStatsRepository.getStatsOfTask(id);
-		List<ProcessMemoryState> mem = taskMemoryStatsRepository.getStatsOfTask(id);
-		
-    	return new TaskStats(id, cpu, mem);
+    	return service.getTaskStats(id).or(new TaskStats(id, new ArrayList<>(), new ArrayList<>()));
     }
+	
+	@RequestMapping(value = "/test",  method = RequestMethod.GET, produces = {"application/json"})
+	public @ResponseBody ApplicationDescriptor application(@PathVariable("username") String user)
+	{
+		ApplicationDescriptor result = new ApplicationDescriptor()
+				.setName("test")
+				.setUser(new User().setUsername("vagrant"))
+				.addApplication(new Application().setName("echo").setCommandLine("echo 'hello world'"));
+		
+		return result;
+	}
 }

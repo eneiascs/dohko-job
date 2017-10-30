@@ -20,8 +20,15 @@ import javax.inject.Inject;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ImportResource;
 import org.springframework.core.env.Environment;
+import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.guava.GuavaModule;
+import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
 
 
 
@@ -36,6 +43,17 @@ public class Application
 	{
 		SpringApplication app = new SpringApplication(Application.class);
 		app.run(args);
+	}
+	
+	@Bean
+	public Jackson2ObjectMapperBuilder objectMapperBuilder() 
+	{
+	    Jackson2ObjectMapperBuilder builder = new Jackson2ObjectMapperBuilder();
+	    builder.serializationInclusion(JsonInclude.Include.NON_NULL)
+	           .featuresToEnable(SerializationFeature.INDENT_OUTPUT)
+	           .modules(new GuavaModule(), new JaxbAnnotationModule());
+	    
+	    return builder;
 	}
 	
 //	@Bean
