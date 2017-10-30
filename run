@@ -1,0 +1,3 @@
+#!/bin/bash
+
+java -cp target/excalibur-job-1.0.0-SNAPSHOT.jar -Dorg.excalibur.jdbc.driver.class.name=com.mysql.jdbc.Driver -Dorg.excalibur.jdbc.url=jdbc:mysql://localhost:3306/dohko -Dorg.excalibur.jdbc.username=root -Dorg.excalibur.jdbc.password=8IPgAdyLp6kGimi7veT75wH4N0TUKINW6ur+9eM2Kr9z -Dorg.excalibur.database.initialize=false org.springframework.boot.loader.JarLauncher
