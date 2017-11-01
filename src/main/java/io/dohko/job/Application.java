@@ -16,8 +16,11 @@
  */
 package io.dohko.job;
 
+import java.util.TimeZone;
+
 import javax.inject.Inject;
 
+import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -30,12 +33,26 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
 
+import springfox.documentation.builders.PathSelectors;
+import springfox.documentation.builders.RequestHandlerSelectors;
+import springfox.documentation.service.Tag;
+import springfox.documentation.spi.DocumentationType;
+import springfox.documentation.spring.web.plugins.Docket;
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
 
-@SpringBootApplication(scanBasePackages = {})
+
+@SpringBootApplication
+@EnableSwagger2
 @ImportResource({"classpath*:META-INF/applicationContext.xml"})
+@EnableBatchProcessing
 public class Application 
 {
+	static 
+	{
+		TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+	}
+	
 	@Inject
 	Environment environment;
 	
@@ -45,6 +62,12 @@ public class Application
 		app.run(args);
 	}
 	
+	/**
+	 * Adds {@link GuavaModule} and {@link JaxbAnnotationModule} as Jackson's modules.
+	 * This enables Spring to serialize and deserialize types annotatted with JAXB annotations
+	 * and to work with Guava collection types such as ImmutableList.
+	 * @return a jackson's builder with {@link GuavaModule} and {@link JaxbAnnotationModule} modules
+	 */
 	@Bean
 	public Jackson2ObjectMapperBuilder objectMapperBuilder() 
 	{
@@ -54,6 +77,17 @@ public class Application
 	           .modules(new GuavaModule(), new JaxbAnnotationModule());
 	    
 	    return builder;
+	}
+
+	@Bean
+	public Docket api() 
+	{
+		return new Docket(DocumentationType.SWAGGER_2)
+				.select().apis(RequestHandlerSelectors.basePackage("io.dohko"))
+				.paths(PathSelectors.any())
+				.build()
+				.pathMapping("/")
+				.tags(new Tag("Dohko Job Service", "All apis relating to Dohko's job scheduling"));
 	}
 	
 //	@Bean

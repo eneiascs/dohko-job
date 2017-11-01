@@ -16,10 +16,14 @@
  */
 package io.dohko.job.resource;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.excalibur.core.domain.User;
 import org.excalibur.core.execution.domain.Application;
 import org.excalibur.core.execution.domain.ApplicationDescriptor;
 import org.excalibur.core.execution.domain.JobStatus;
+import org.excalibur.core.execution.domain.TaskOutput;
 import org.excalibur.core.execution.domain.TaskStats;
 import org.excalibur.core.execution.domain.TaskStatus;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,16 +36,18 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.google.common.collect.ImmutableList;
+
 import io.dohko.job.batch.JobService;
-
-import static java.util.Objects.requireNonNull;
-
-import java.util.ArrayList;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 
 import static com.google.common.base.Preconditions.checkState;
+import static java.util.Objects.requireNonNull;
 
 @RestController
 @RequestMapping(value = "/{username}/jobs")
+@Api(value = "jobs", tags = "Job API")
 public class JobRestController 
 {
 	private final JobService service;
@@ -54,6 +60,7 @@ public class JobRestController
 		
 	@RequestMapping(method = RequestMethod.POST, produces = {"application/json"})
 	@ResponseStatus(HttpStatus.CREATED)
+	@ApiOperation(value = "Creates and schedules a new job based on a given job's description", response = JobStatus.class)
 	public @ResponseBody JobStatus create(@PathVariable("username") String user, @RequestBody ApplicationDescriptor job)
 	{
 		requireNonNull(job.getUser(), "job's username is undefined");
@@ -66,7 +73,7 @@ public class JobRestController
 	@ResponseStatus(HttpStatus.OK)
 	public @ResponseBody ApplicationDescriptor get(@PathVariable("username") String user, @PathVariable("jobId") String jobId)
 	{
-		return service.getJob(user, jobId);
+		return service.getJob(user, jobId).orNull();
 	}
 	
 	@RequestMapping(value = "/{jobId}/status", method = RequestMethod.GET, produces = { "application/json" })
@@ -76,19 +83,33 @@ public class JobRestController
 		return service.getJobTaskStatuses(jobId).or(new JobStatus().setId(jobId));
 	}
 	
-	@RequestMapping(value = "/task/{taskId}/status", method = RequestMethod.GET, produces = { "application/json" })
+	@RequestMapping(value = "/{jobId}/tasks", method = RequestMethod.GET, produces = { "application/json" })
 	@ResponseStatus(HttpStatus.OK)
-	public @ResponseBody TaskStatus status(@PathVariable("username") String user, @PathVariable("taskId") final String taskId)
+	public @ResponseBody List<Application> jobTasklets(@PathVariable("username") String user, @PathVariable("jobId") String jobId)
 	{
-		return service.lastTaskStatus(taskId).orNull();
+		return service.getTasksOfJob(jobId);
 	}
 	
-	@RequestMapping(value = "/task/{id}/stats",  method = RequestMethod.GET, produces = {"application/json"})
+	@RequestMapping(value = "/{jobId}/task/{taskId}/status", method = RequestMethod.GET, produces = { "application/json" })
 	@ResponseStatus(HttpStatus.OK)
-    public @ResponseBody TaskStats stats(@PathVariable("username") String user, @PathVariable("id") final String id)
+	public @ResponseBody TaskStatus status(@PathVariable("username") String user, @PathVariable("jobId") String jobId, @PathVariable("taskId") final String taskId)
+	{
+		return service.lastTaskStatus(jobId, taskId).orNull();
+	}
+	
+	@RequestMapping(value = "/{jobId}/task/{taskId}/stats",  method = RequestMethod.GET, produces = {"application/json"})
+	@ResponseStatus(HttpStatus.OK)
+    public @ResponseBody TaskStats stats(@PathVariable("username") String user, @PathVariable("jobId") String jobId, @PathVariable("taskId") final String taskId)
     {
-    	return service.getTaskStats(id).or(new TaskStats(id, new ArrayList<>(), new ArrayList<>()));
+    	return service.getTaskStats(taskId).or(new TaskStats(taskId, new ArrayList<>(), new ArrayList<>()));
     }
+	
+	@RequestMapping(value = "/{jobId}/task/{taskId}/output",  method = RequestMethod.GET, produces = {"application/json"})
+	@ResponseStatus(HttpStatus.OK)
+	public @ResponseBody ImmutableList<TaskOutput> output(@PathVariable("username") String user, @PathVariable("jobId") final String jobId, @PathVariable("taskId") final String taskId)
+	{
+		return service.getTaskOutput(jobId, taskId);
+	}
 	
 	@RequestMapping(value = "/test",  method = RequestMethod.GET, produces = {"application/json"})
 	public @ResponseBody ApplicationDescriptor application(@PathVariable("username") String user)
