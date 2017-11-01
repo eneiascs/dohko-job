@@ -18,11 +18,29 @@
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<internal.snapshots.repo.path>file://${basedir}/../maven-repo/snapshots</internal.snapshots.repo.path>
 		<internal.release.repo.path>file://${basedir}/../maven-repo/releases</internal.release.repo.path>
-		<license-header-file>${basedir}/../../dohko/HEADER</license-header-file>
+		<license-header-file>${basedir}/HEADER</license-header-file>
 		<checkstyle.file>${basedir}/../checkstyle.xml</checkstyle.file>
 
 		<spring-boot-version>1.5.8.RELEASE</spring-boot-version>
 	</properties>
+	
+	<repositories>
+		<repository>
+			<id>github-snapshot-repo</id>
+			<url>https://github.com/alessandroleite/maven-repository/raw/master/snapshots</url>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+
+		<repository>
+			<id>github-release-repo</id>
+			<url>https://github.com/alessandroleite/maven-repository/raw/master/releases</url>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+	</repositories>
 
 	<dependencyManagement>
 		<dependencies>
