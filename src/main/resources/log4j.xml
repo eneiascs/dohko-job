@@ -30,91 +30,10 @@
 		</layout>
 	</appender>
 	
-	<appender name="overlay.log" class="org.apache.log4j.RollingFileAppender">
-		<param name="MaxFileSize" value="5120KB" />
-		<param name="MaxBackupIndex" value="10" />
-		<param name="File" value="${org.excalibur.logs.dir}/overlay.log" />
-		<layout class="org.apache.log4j.PatternLayout">
-			<param name="ConversionPattern" value="%d %-5p [%-c{1}] - %m%n" />
-		</layout>
-	</appender>
-	
-	<appender name="new.instances.config.appender" class="org.apache.log4j.RollingFileAppender">
-		<param name="MaxFileSize" value="5120KB" />
-		<param name="MaxBackupIndex" value="10" />
-		<param name="File" value="${org.excalibur.logs.dir}/new-instances-handler.log" />
-		<layout class="org.apache.log4j.PatternLayout">
-			<param name="ConversionPattern" value="%d %-5p [%-c{1}] - %m%n" />
-		</layout>
-	</appender>
-	
-	<appender name="remote.executor.appender" class="org.apache.log4j.RollingFileAppender">
-		<param name="MaxFileSize" value="5120KB" />
-		<param name="MaxBackupIndex" value="10" />
-		<param name="File" value="${org.excalibur.logs.dir}/remote-task-executor.log" />
-		<layout class="org.apache.log4j.PatternLayout">
-			<param name="ConversionPattern" value="%d %-5p [%-c{1}] - %m%n" />
-		</layout>
-	</appender>
-	
-	<appender name="ssh.connection.appender" class="org.apache.log4j.RollingFileAppender">
-		<param name="MaxFileSize" value="5120KB" />
-		<param name="MaxBackupIndex" value="10" />
-		<param name="File" value="${org.excalibur.logs.dir}/ssh-connections.log" />
-		<layout class="org.apache.log4j.PatternLayout">
-			<param name="ConversionPattern" value="%d %-5p [%-c{1}] - %m%n" />
-		</layout>
-	</appender>
-	
-	<appender name="google.driver.appender" class="org.apache.log4j.RollingFileAppender">
-		<param name="MaxFileSize" value="5120KB" />
-		<param name="MaxBackupIndex" value="10" />
-		<param name="File" value="${org.excalibur.logs.dir}/google-driver.log" />
-		<layout class="org.apache.log4j.PatternLayout">
-			<param name="ConversionPattern" value="%d %-5p [%-c{1}] - %m%n" />
-		</layout>
-	</appender>
-	
-	<appender name="instance.configuration.handler" class="org.apache.log4j.RollingFileAppender">
+	<appender name="task.configuration.handler" class="org.apache.log4j.RollingFileAppender">
 		<param name="MaxFileSize" value="5120KB" />
 		<param name="MaxBackupIndex" value="10" />
 		<param name="File" value="${org.excalibur.logs.dir}/instance-configuration-handler.log" />
-		<layout class="org.apache.log4j.PatternLayout">
-			<param name="ConversionPattern" value="%d %-5p [%-c{1}] - %m%n" />
-		</layout>
-	</appender>
-	
-	<appender name="script.engine.processor" class="org.apache.log4j.RollingFileAppender">
-		<param name="MaxFileSize" value="5120KB" />
-		<param name="MaxBackupIndex" value="10" />
-		<param name="File" value="${org.excalibur.logs.dir}/script-engine-processor.log" />
-		<layout class="org.apache.log4j.PatternLayout">
-			<param name="ConversionPattern" value="%d %-5p [%-c{1}] - %m%n" />
-		</layout>
-	</appender>
-	
-	<appender name="node.manager.appender" class="org.apache.log4j.RollingFileAppender">
-		<param name="MaxFileSize" value="5120KB" />
-		<param name="MaxBackupIndex" value="10" />
-		<param name="File" value="${org.excalibur.logs.dir}/node-manager.log" />
-		<layout class="org.apache.log4j.PatternLayout">
-			<param name="ConversionPattern" value="%d %-5p [%-c{1}] - %m%n" />
-		</layout>
-	</appender>
-	
-	<appender name="data.source.appender" class="org.apache.log4j.RollingFileAppender">
-		<param name="MaxFileSize" value="5120KB" />
-		<param name="MaxBackupIndex" value="10" />
-		<param name="File" value="${org.excalibur.logs.dir}/data-source.log" />
-		<layout class="org.apache.log4j.PatternLayout">
-			<param name="ConversionPattern" value="%d %-5p [%-c{1}] - %m%n" />
-		</layout>
-	</appender>
-	
-	<appender name="xmpp.appender" class="org.apache.log4j.RollingFileAppender">
-		<param name="MaxFileSize" value="5120KB" />
-		<param name="MaxBackupIndex" value="10" />
-		<param name="File" value="${org.excalibur.logs.dir}/xmpp-data.log" />
 		<layout class="org.apache.log4j.PatternLayout">
 			<param name="ConversionPattern" value="%d %-5p [%-c{1}] - %m%n" />
 		</layout>
@@ -136,50 +55,9 @@
 	<category name="org.excalibur">
 	  <level value="debug"/>
 	</category>
-	
-	<category name="br">
-	  <level value="error"/>
-	  <appender-ref ref="overlay.log"/> 	  
-	</category>
-	
-	<category name="org.excalibur.aqmp.handler.InstancesHandler">
-	  <level value="debug"/>
-	  <appender-ref ref="new.instances.config.appender"/> 	  
-	</category>
-	
-	<category name="org.excalibur.core.exec.RemoteScriptStatementExecutor">
-	  <level value="debug"/>
-	  <appender-ref ref="remote.executor.appender"/>
-	</category>
-	
-	<category name="org.excalibur.aqmp.handler.InstanceConfigurationHandler">
-	  <level value="debug"/>
-	  <appender-ref ref="instance.configuration.handler"/>
-	</category>
-	
-	<category name="org.excalibur.core.deployment.domain.engine.ScriptStatementProcessor">
-	  <level value="debug"/>
-	  <appender-ref ref="script.engine.processor"/>
-	</category>
-	
-	<category name="org.excalibur.core.ssh">
-	  <level value="debug"/>
-	  <appender-ref ref="ssh.connection.appender"/>
-	</category>
-	
-	<category name="org.excalibur.driver.google.compute">
-	  <level value="debug"/>
-	  <appender-ref ref="google.driver.appender"/>
-	</category>
-	
-	<category name="org.excalibur.service.manager.NodeManager">
-	  <level value="debug"/>
-	  <appender-ref ref="node.manager.appender"/>
-	</category>
-	
-	<category name="org.apache.vysper.xmpp">
-	  <level value="info"/>
-	  <appender-ref ref="xmpp.appender"/>
+
+	<category name="io.dohko">
+		<level value="debug" />
 	</category>
 	
 	

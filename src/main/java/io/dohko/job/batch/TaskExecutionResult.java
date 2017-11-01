@@ -106,4 +106,14 @@ public class TaskExecutionResult
 				.omitNullValues()
 				.toString();
 	}
+
+	public int getExitCode() 
+	{
+		return result.getExitCode();
+	}
+	
+	public String getOutput()
+	{
+		return this.result.getCommandOutput();
+	}
 }

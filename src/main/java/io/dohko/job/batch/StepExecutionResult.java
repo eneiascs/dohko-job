@@ -17,7 +17,6 @@
 package io.dohko.job.batch;
 
 import io.airlift.command.CommandFailedException;
-import io.airlift.command.CommandResult;
 import job.flow.Step;
 
 import static java.util.Objects.requireNonNull;
@@ -25,7 +24,7 @@ import static java.util.Objects.requireNonNull;
 public class StepExecutionResult 
 {
 	private final Step step;
-	private CommandResult result;
+	private TaskExecutionResult taskExecutionResult;
 	private CommandFailedException exception;
 
 	public StepExecutionResult(Step step) 
@@ -40,12 +39,12 @@ public class StepExecutionResult
 	
 	public boolean isSuccessfully()
 	{
-		return result != null && exception == null;
+		return taskExecutionResult != null && exception == null;
 	}
 
-	public StepExecutionResult setResult(CommandResult result) 
+	public StepExecutionResult setResult(TaskExecutionResult result) 
 	{
-		this.result = result;
+		this.taskExecutionResult = result;
 		return this;
 	}
 
@@ -58,9 +57,9 @@ public class StepExecutionResult
 	/**
 	 * @return the result
 	 */
-	public CommandResult getResult() 
+	public TaskExecutionResult getResult() 
 	{
-		return result;
+		return taskExecutionResult;
 	}
 
 	/**

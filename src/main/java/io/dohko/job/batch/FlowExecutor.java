@@ -69,7 +69,7 @@ public class FlowExecutor
 		{
 			if (!wasCancelled())
 			{
-				StepExecutionResult result = new StepExecutionResult(step);
+				StepExecutionResult stepExecutionResult = new StepExecutionResult(step);
 
 				try 
 				{
@@ -77,20 +77,18 @@ public class FlowExecutor
 					
 					LOG.info("Executing the task [{},{}]", step.getId(), step.getName());
 					
-					TaskExecutionResult taskResult = new TaskExecutionResult(step.getId(), step.execute(executor));
+					stepExecutionResult.setResult(new TaskExecutionResult(step.getId(), step.execute(executor)));
 					
-					LOG.info("Finished task [{},{}] with exitcode [{}]", step.getId(), step.getName(), result.getResult().getExitCode());
+					LOG.info("Finished task [{},{}] with exitcode [{}]", step.getId(), step.getName(), stepExecutionResult.getResult().getExitCode());
 					
 					if (LOG.isDebugEnabled())
 					{
-						LOG.debug("Task [{},{}]'s output is [{}]", step.getId(), step.getName(), result.getResult().getCommandOutput());
+						LOG.debug("Task [{},{}]'s output is [{}]", step.getId(), step.getName(), stepExecutionResult.getResult().getOutput());
 					}
 					
 					eventBus.post(newTaskStatus(step.id(), step.name(), FINISHED));
 					
-					result.setResult(taskResult.getResult());
-					
-					eventBus.post(taskResult);
+					eventBus.post(stepExecutionResult.getResult());
 				} 
 				catch (CommandFailedException cfe) 
 				{
@@ -99,12 +97,12 @@ public class FlowExecutor
 						LOG.debug("The reason for task [{}, {}] is", step.getId(), step.getName(), cfe);
 					}
 					
-					result.setException(cfe);
+					stepExecutionResult.setException(cfe);
 					eventBus.post(newTaskStatus(step.id(), step.name(), FAILED));
 				}
 				finally
 				{
-					flowResult.addStepResult(result);
+					flowResult.addStepResult(stepExecutionResult);
 				}
 			} 
 			else 
