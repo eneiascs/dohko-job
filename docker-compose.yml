@@ -37,6 +37,7 @@ services:
       - .:/opt/dohko/job
     ports:
       - 3300:8080
+      - 8000:8000
     working_dir: /opt/dohko/job
     command: /bin/bash -c "/opt/dohko/job/run"
     security_opt:
