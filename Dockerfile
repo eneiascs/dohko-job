@@ -1,6 +1,7 @@
 FROM centos:7
 
 ENV JAVA_HOME="/opt/java"
+ENV PATH='${JAVA_HOME}/bin:$PATH'
 
 RUN yum update -y && \
     yum install -y epel-release && \
@@ -28,4 +29,5 @@ RUN yum update -y && \
     rm -rf /root/.cache 
 
 EXPOSE 8080
+EXPOSE 8000
 CMD ["/bin/bash"]
