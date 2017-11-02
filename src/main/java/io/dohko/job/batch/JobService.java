@@ -171,6 +171,11 @@ public class JobService
 		{
 			TaskStats stats = result.stats();
 			
+			if (!result.getResult().getProcessStats().isEmpty())
+			{
+				taskStatusRepository.updateTaskPid(result.getId(), result.getResult().getProcessStats().get(0).getPid());
+			}
+			
 			taskCpuStatsRepository.insert(stats.getCpu());
 			taskMemoryStatsRepository.insert(stats.getMemory());
 			
