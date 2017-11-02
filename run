@@ -1,3 +1,18 @@
 #!/bin/bash
 
-java -cp target/excalibur-job-1.0.0-SNAPSHOT.jar -Duser.timezone=UTC -Dorg.excalibur.jdbc.driver.class.name=com.mysql.jdbc.Driver -Dorg.excalibur.jdbc.url=jdbc:mysql://localhost:3306/dohko -Dorg.excalibur.jdbc.username=root -Dorg.excalibur.jdbc.password=8IPgAdyLp6kGimi7veT75wH4N0TUKINW6ur+9eM2Kr9z -Dorg.excalibur.database.initialize=false org.springframework.boot.loader.JarLauncher
+: ${DATABASE_NAME:="dohko"}
+: ${DATABASE_USERNAME:="dohko"}
+: ${DATABASE_PASSWORD:="znntSsYTV+6HN3fmueF9QxKtX/ooBTzvRubWMAKevFY="}
+: ${JDBC_DRIVER_CLASS:="com.mysql.jdbc.Driver"}
+: ${JDBC_DATABASE_URL:="jdbc:mysql://localhost:3306/$DATABASE_NAME"}
+
+export PATH=${JAVA_HOME}/bin:$PATH
+
+java -cp target/excalibur-job-1.0.0-SNAPSHOT.jar \
+     -Duser.timezone=UTC \
+     -Dorg.excalibur.jdbc.driver.class.name=${JDBC_DRIVER_CLASS} \
+     -Dorg.excalibur.jdbc.url=${JDBC_DATABASE_URL} \
+     -Dorg.excalibur.jdbc.username=${DATABASE_USERNAME} \
+     -Dorg.excalibur.jdbc.password=${DATABASE_PASSWORD} \
+     -Dorg.excalibur.database.initialize=true \
+     org.springframework.boot.loader.JarLauncher
