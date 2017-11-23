@@ -26,12 +26,10 @@ import org.excalibur.core.execution.domain.TaskStats;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableList;
 
 import io.airlift.command.CommandResult;
 import io.airlift.command.ProcessCpuState;
 import io.airlift.command.ProcessMemoryState;
-import io.airlift.command.ProcessState;
 
 @Immutable
 public class TaskExecutionResult 
@@ -77,8 +75,7 @@ public class TaskExecutionResult
 	
 	public Optional<Long> getPid()
 	{
-		ImmutableList<ProcessState> stats = result.getProcessStats();
-		return stats.isEmpty() ? Optional.absent() : Optional.of(stats.get(0).getPid());
+		return Optional.of(result.getPid());
 	}
 	
 	
@@ -123,6 +120,6 @@ public class TaskExecutionResult
 	
 	public String getOutput()
 	{
-		return this.result.getCommandOutput();
+		return result.getCommandOutput();
 	}
 }

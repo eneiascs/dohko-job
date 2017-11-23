@@ -16,9 +16,6 @@
  */
 package io.dohko.job.batch;
 
-import static java.lang.String.format;
-import static java.util.Objects.requireNonNull;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,9 +39,12 @@ import com.google.common.util.concurrent.MoreExecutors;
 
 import job.flow.Job;
 
+import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
+
 public class LocalShellJobLaucher implements JobLauncher 
 {
-	private final EventBus listeners;
+	private final EventBus subscribers;
 	private final Map<String, Future<?>> futures = new HashMap<>();
 	
 	private final ListeningExecutorService executor;
@@ -54,7 +54,7 @@ public class LocalShellJobLaucher implements JobLauncher
 	{
 		this.executor = MoreExecutors.listeningDecorator(requireNonNull(executor, "executor is null"));
 		eventBusExecutor = new SerialExecutor(Executors.newFixedThreadPool(1));
-		listeners = new AsyncEventBus("localjoblaucher", eventBusExecutor);
+		subscribers = new AsyncEventBus("localjoblaucher", eventBusExecutor);
 	}
 
 	@Override
@@ -62,8 +62,19 @@ public class LocalShellJobLaucher implements JobLauncher
 	{
 		if (listener != null)
 		{
-			listeners.register(listener);
+			subscribers.register(listener);
 		}
+	}
+	
+	public void run(final Iterable<Job> jobs)
+	{
+		executor.submit(() -> 
+		{
+			for (Job job : jobs)
+			{
+				execute(job);
+			}
+		});
 	}
 
 	@Override
@@ -71,36 +82,41 @@ public class LocalShellJobLaucher implements JobLauncher
 	{
 		executor.submit(() -> 
 		{
-			List<ListenableFuture<?>> flowHandles = new ArrayList<>(); 
-			
-			final ListeningExecutorService flowExecutorService = DynamicExecutors.newListeningDynamicScalingThreadPool(format("job-%s-flows-executor", job.getName()));
-			
-			// Flows can be executed in parallel, whereas their steps are executed sequentially.
-			job.flows().forEach(flow -> 
-			{
-				ListenableFuture<?> flowHandle = flowExecutorService.submit(() -> 
-				{
-					
-					FlowExecutionResult result = new FlowExecutor(flow, DynamicExecutors.newListeningDynamicScalingThreadPool(flow.getName()))
-					      .registerListener(LocalShellJobLaucher.this)
-					      .execute();
-					
-					listeners.post(result);
-				});
-				
-				flowHandles.add(flowHandle);
-			});
+			execute(job);
 		});
 		
 //		Futures2.addCallback(futures, callback)
 		
 		return Optional.absent();
 	}
+
+	private void execute(final Job job) 
+	{
+		List<ListenableFuture<?>> flowHandles = new ArrayList<>(); 
+		
+		final ListeningExecutorService flowExecutorService = DynamicExecutors.newListeningDynamicScalingThreadPool(format("job-%s-flows-executor", job.getName()));
+		
+		// Flows can be executed in parallel, whereas their steps are executed sequentially.
+		job.flows().forEach(flow -> 
+		{
+			ListenableFuture<?> flowHandle = flowExecutorService.submit(() -> 
+			{
+				
+				FlowExecutionResult result = new FlowExecutor(flow, DynamicExecutors.newListeningDynamicScalingThreadPool(flow.getName()))
+				      .registerListener(LocalShellJobLaucher.this)
+				      .execute();
+				
+				subscribers.post(result);
+			});
+			
+			flowHandles.add(flowHandle);
+		});
+	}
 	
 	@Subscribe
 	protected void postEvent(final Object event)
 	{
-		listeners.post(event);
+		subscribers.post(event);
 	}
 	
 	

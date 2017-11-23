@@ -16,13 +16,7 @@
  */
 package io.dohko.job.batch;
 
-import static java.lang.String.format;
-import static java.util.Objects.requireNonNull;
-import static org.excalibur.core.execution.domain.TaskStatus.newTaskStatus;
-import static org.excalibur.core.execution.domain.TaskStatus.runningTaskStatus;
-import static org.excalibur.core.execution.domain.TaskStatusType.FAILED;
-import static org.excalibur.core.execution.domain.TaskStatusType.FINISHED;
-
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -32,7 +26,15 @@ import org.slf4j.LoggerFactory;
 import com.google.common.eventbus.EventBus;
 
 import io.airlift.command.CommandFailedException;
+import io.airlift.command.CommandResult;
 import job.flow.Flow;
+
+import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
+import static org.excalibur.core.execution.domain.TaskStatus.newTaskStatus;
+import static org.excalibur.core.execution.domain.TaskStatus.runningTaskStatus;
+import static org.excalibur.core.execution.domain.TaskStatusType.FAILED;
+import static org.excalibur.core.execution.domain.TaskStatusType.FINISHED;
 
 
 public class FlowExecutor 
@@ -83,22 +85,25 @@ public class FlowExecutor
 					
 					if (LOG.isDebugEnabled())
 					{
-						LOG.debug("Task [{},{}]'s output is [{}]", step.getId(), step.getName(), stepExecutionResult.getResult().getOutput());
+						LOG.debug("Task [{},{}]'s output is [{}]", step.getId(), step.getName(), stepExecutionResult.getOutput());
 					}
 					
 					eventBus.post(newTaskStatus(step.id(), step.name(), FINISHED));
-					
 					eventBus.post(stepExecutionResult.getResult());
 				} 
 				catch (CommandFailedException cfe) 
 				{
+					stepExecutionResult.setException(cfe);
+					
+					LOG.info("Task [{},{}] failed with exitcode [{}]", step.getId(), step.getName(), stepExecutionResult.getExitCode());
+					
 					if (LOG.isDebugEnabled())
 					{
-						LOG.debug("The reason for task [{}, {}] is", step.getId(), step.getName(), cfe);
+						LOG.debug(format("The reason is %s", cfe.getOutput()), cfe);
 					}
 					
-					stepExecutionResult.setException(cfe);
 					eventBus.post(newTaskStatus(step.id(), step.name(), FAILED));
+					eventBus.post(new TaskExecutionResult(step.getId(), new CommandResult(UUID.randomUUID().toString(), cfe.getPid() != null ? Long.valueOf(cfe.getPid().intValue()) : null, cfe.getExitCode(), cfe.getOutput(), 0L)));
 				}
 				finally
 				{

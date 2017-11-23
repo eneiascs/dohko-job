@@ -18,28 +18,29 @@ package job.flow;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executor;
 
-import javax.annotation.concurrent.Immutable;
-
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableList;
 
 import io.airlift.command.Command;
 import io.airlift.command.CommandFailedException;
 import io.airlift.command.CommandResult;
 
-@Immutable
 public class Step 
 {
 	private final String id;
 	private final String name;
 	private final Command action;
+	private final List<Command> tasklets = new ArrayList<>();
 	
 	public Step(String id, String name, Command action)
 	{
 		this.id = requireNonNull(id, "Steps's id is null");
 		this.name = requireNonNull(name, "Step's name is null");
-		this.action = action;
+		this.action = requireNonNull(action, "action is null");
 	}
 
 	/**
@@ -70,10 +71,52 @@ public class Step
 	{
 		return getId();
 	}
-
-
-	public CommandResult execute(Executor executor) throws CommandFailedException
+	
+	/**
+	 * @return the action
+	 */
+	public Command getAction() 
 	{
+		return action;
+	}
+	
+	public Command action()
+	{
+		return action;
+	}
+	
+	public Step addTaskLets(Command ... commands) 
+	{
+		if (commands != null)
+		{
+			for (Command task: commands)
+			{
+				tasklets.add(task);
+			}
+		}
+		
+		return this;
+	}
+	
+	public ImmutableList<Command> taskLets()
+	{
+		return ImmutableList.copyOf(tasklets);
+	}
+
+	public CommandResult execute(Executor executor) throws CommandFailedException 
+	{
+		try 
+		{
+			for (Command task : tasklets) 
+			{
+				task.execute(executor);
+			}
+		} 
+		catch (CommandFailedException e) 
+		{
+			e.printStackTrace();
+		}
+
 		return action.execute(executor);
 	}
 	
@@ -86,4 +129,6 @@ public class Step
 				.omitNullValues()
 				.toString();
 	}
+
+	
 }

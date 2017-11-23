@@ -83,10 +83,11 @@ public class Application
 	public Docket api() 
 	{
 		return new Docket(DocumentationType.SWAGGER_2)
-				.select().apis(RequestHandlerSelectors.basePackage("io.dohko"))
+				.select()
+				.apis(RequestHandlerSelectors.basePackage("io.dohko.job.resource"))
 				.paths(PathSelectors.any())
 				.build()
-				.pathMapping("/")
+				// .pathMapping("/")
 				.tags(new Tag("Dohko Job Service", "All apis relating to Dohko's job scheduling"));
 	}
 	

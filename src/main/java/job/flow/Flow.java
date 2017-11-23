@@ -18,13 +18,16 @@ package job.flow;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 
 public class Flow
 {
-	private final Map<String, Step> steps = new LinkedHashMap<>();
+	private final Map<String, Flow> parents = new ConcurrentHashMap<>();
+	private final Map<String, Step> steps =  new LinkedHashMap<>();
 	private final String name;
 	
 	public Flow(String name)
@@ -41,6 +44,16 @@ public class Flow
 		
 		return this;
 	}
+	
+	public Flow addParent(Flow parent)
+	{
+		if (parent != null && !this.equals(parent))
+		{
+			parents.put(parent.getName(), parent);
+		}
+		
+		return this;
+	}
 
 	/**
 	 * @return the steps
@@ -48,6 +61,11 @@ public class Flow
 	public ImmutableList<Step> steps() 
 	{
 		return ImmutableList.copyOf(steps.values());
+	}
+	
+	public ImmutableList<Flow> parents()
+	{
+		return ImmutableList.copyOf(parents.values());
 	}
 
 	/**
@@ -66,5 +84,28 @@ public class Flow
 				.add("nr. steps", steps.size())
 				.omitNullValues()
 				.toString();
+	}
+	
+	@Override
+	public boolean equals(Object obj) 
+	{
+		if (this == obj)
+		{
+			return true;
+		}
+		
+		if (obj == null || getClass() != obj.getClass())
+		{
+			return false;
+		}
+		
+		Flow other = (Flow) obj;
+		return Objects.equals(getName(), other.getName());
+	}
+	
+	@Override
+	public int hashCode() 
+	{
+		return Objects.hash(getName());
 	}
 }

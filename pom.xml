@@ -22,8 +22,9 @@
 		<checkstyle.file>${basedir}/../checkstyle.xml</checkstyle.file>
 
 		<spring-boot-version>1.5.8.RELEASE</spring-boot-version>
+		<os-platform-finder.version>1.0</os-platform-finder.version>
 	</properties>
-	
+
 	<repositories>
 		<repository>
 			<id>github-snapshot-repo</id>
@@ -132,9 +133,9 @@
 			</exclusions>
 		</dependency>
 
-		<dependency> 
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-batch</artifactId> 
+			<artifactId>spring-boot-starter-batch</artifactId>
 		</dependency>
 
 		<!-- <dependency> <groupId>org.springframework.boot</groupId> <artifactId>spring-boot-actuator</artifactId> 
@@ -176,6 +177,11 @@
 		<dependency>
 			<groupId>io.springfox</groupId>
 			<artifactId>springfox-swagger2</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>io.springfox</groupId>
+			<artifactId>springfox-swagger-ui</artifactId>
 		</dependency>
 
 		<dependency>
@@ -242,6 +248,12 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-devtools</artifactId>
 			<optional>true</optional>
+		</dependency>
+
+		<dependency>
+			<groupId>org.jsoftbiz</groupId>
+			<artifactId>os-platform-finder</artifactId>
+			<version>${os-platform-finder.version}</version>
 		</dependency>
 
 	</dependencies>

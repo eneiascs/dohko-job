@@ -16,20 +16,16 @@
  */
 package io.dohko.job.batch;
 
-import static com.google.common.base.Strings.isNullOrEmpty;
-import static java.util.UUID.randomUUID;
-import static org.excalibur.core.execution.domain.TaskStatusType.PENDING;
-
-import java.time.Instant;
-import java.time.ZoneOffset;
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import org.excalibur.core.execution.domain.Application;
 import org.excalibur.core.execution.domain.ApplicationDescriptor;
 import org.excalibur.core.execution.domain.JobStatus;
+import org.excalibur.core.execution.domain.Precondition;
 import org.excalibur.core.execution.domain.TaskOutput;
 import org.excalibur.core.execution.domain.TaskOutputType;
 import org.excalibur.core.execution.domain.TaskStats;
@@ -40,8 +36,8 @@ import org.excalibur.core.execution.domain.repository.TaskMemoryStatsRepository;
 import org.excalibur.core.execution.domain.repository.TaskOutputRepository;
 import org.excalibur.core.execution.domain.repository.TaskRepository;
 import org.excalibur.core.execution.domain.repository.TaskStatusRepository;
+import org.excalibur.core.host.repository.PackageRepository;
 import org.excalibur.core.util.concurrent.DynamicExecutors;
-import org.springframework.batch.core.JobParameters;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,15 +49,32 @@ import com.google.common.eventbus.Subscribe;
 import io.airlift.command.Command;
 import io.airlift.command.ProcessCpuState;
 import io.airlift.command.ProcessMemoryState;
+import io.airlift.command.ProcessState;
+import io.dohko.job.host.Package;
+import io.dohko.job.host.PackageManagerType;
 import job.flow.Flow;
 import job.flow.Job;
 import job.flow.Step;
 
+
+import static com.google.common.base.Strings.isNullOrEmpty;
+import static com.google.common.hash.Hashing.sha256;
+import static io.airlift.command.Command.newBashCommand;
+import static java.lang.String.format;
+import static java.lang.System.getProperty;
+import static  java.nio.charset.StandardCharsets.UTF_8;
+import static java.time.Instant.now;
+import static java.time.ZoneOffset.UTC;
+import static java.util.UUID.randomUUID;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.excalibur.core.execution.domain.TaskStatusType.PENDING;
+
+import static java.lang.Math.*;
+
+
 @Service
 public class JobService 
 {
-//	private final EventBus bus = new EventBus("jobservice");
-	
 	private final JobRepository jobRepository;
 	
 	private final TaskRepository taskRepository;
@@ -69,12 +82,11 @@ public class JobService
 	private final TaskCpuStatsRepository taskCpuStatsRepository;
 	private final TaskMemoryStatsRepository taskMemoryStatsRepository;
 	private final TaskOutputRepository taskOutputRepository;
-	
-	
+	private final PackageRepository packageRepository;
 	private final LocalShellJobLaucher localShellJobLaucher; 
 	
 	@Autowired
-	public JobService (JobRepository jobRepository, TaskRepository taskRepository, TaskStatusRepository taskStatusRepository, TaskCpuStatsRepository taskCpuStatsRepository, TaskMemoryStatsRepository taskMemoryStatsRepository, TaskOutputRepository taskOutputRepository)
+	public JobService (JobRepository jobRepository, TaskRepository taskRepository, TaskStatusRepository taskStatusRepository, TaskCpuStatsRepository taskCpuStatsRepository, TaskMemoryStatsRepository taskMemoryStatsRepository, TaskOutputRepository taskOutputRepository, PackageRepository packageRepository)
 	{
 		this.jobRepository = jobRepository;
 		this.taskRepository = taskRepository;
@@ -82,6 +94,7 @@ public class JobService
 		this.taskCpuStatsRepository = taskCpuStatsRepository;
 		this.taskMemoryStatsRepository = taskMemoryStatsRepository;
 		this.taskOutputRepository = taskOutputRepository;
+		this.packageRepository = packageRepository;
 		
 		localShellJobLaucher = new LocalShellJobLaucher(DynamicExecutors.newListeningDynamicScalingThreadPool("job-executors"));
 		localShellJobLaucher.registerListener(this);
@@ -97,10 +110,11 @@ public class JobService
 		
 		JobStatus result = new JobStatus(job.getId(), job.getName());
 		
-		jobRepository.insert(job.setCreatedIn(Instant.now().atZone(ZoneOffset.UTC).toInstant().toEpochMilli()));
+		jobRepository.insert(job.setCreatedIn(now().atZone(UTC).toInstant().toEpochMilli()));
 		
 		List<Job> jobs = new ArrayList<>();
 		
+		jobs.add(configurePreconditions(result, job.preconditions()));
 		jobs.add(configureApplications(result, job.applications()));
 		
 		job.blocks().forEach(b -> jobs.add(configureApplications(result, b.applications())));
@@ -108,11 +122,38 @@ public class JobService
 		createApplications(job.applications());
 		createTaskStatuses(result.statuses());
 		
-		jobs.forEach(j -> localShellJobLaucher.run(j, new JobParameters()));
+//		jobs.forEach(j -> localShellJobLaucher.run(j, new JobParameters()));
+		localShellJobLaucher.run(jobs);
 		
 		return result;
 	}
 	
+	private Job configurePreconditions(JobStatus status, List<Precondition> preconditions) 
+	{
+		Job job = new Job(format("preconditions-%s", status.getId()));
+		
+		preconditions.forEach(precondition -> 
+		{
+			Flow flow = new Flow(format("preconditions-%s-flow", status.getId()));
+			List<Package> packages = new ArrayList<>();
+			
+			precondition.getPackages().forEach( name -> 
+			{
+				Optional<Package> pkg = packageRepository.findByName(name);
+				
+				if (pkg.isPresent())
+				{
+					packages.add(pkg.get());
+				}
+			});
+			
+			flow.add(new Step(flow.getName(), flow.getName() + "packages", PackageManagerType.command(packages)));
+			job.add(flow);
+		});
+		
+		return job;
+	}
+
 	protected Job configureApplications(final JobStatus jobStatus, final Iterable<Application> applications)
 	{
 		Job job = new Job(jobStatus.getId());
@@ -132,11 +173,33 @@ public class JobService
 					  .setTaskName(application.getName())
 					  .setType(PENDING));
 			
-			Flow flow = new Flow(application.getName());
-			flow.add(new Step(application.getId(), application.getName(),
-					new Command("bash", "-c", application.getCommandLine())
-					    .setTimeLimit(application.getTimeout() == null ? Integer.MAX_VALUE : application.getTimeout(), TimeUnit.HOURS)));
+			final Flow flow = new Flow(application.getName());
+			final Step step = new Step(application.getId(), application.getName(),
+					new Command(application.getId(), "bash", "-c", application.getCommandLine())
+							.registerListeners(Collections.singletonList(JobService.this))
+							.setTimeLimit(application.getTimeout() == null ? 3600 : application.getTimeout(), SECONDS));
 			
+			application.getFiles().forEach(f -> 
+			{ 
+				step.action().addEnvironment(f.getName(), f.getDest());
+				
+				java.util.Optional<URI> uri = f.getSourceURI();
+				
+				if (uri.isPresent() && uri.get().getScheme() != null)
+				{
+					switch(uri.get().getScheme())
+					{
+					case "http":
+					case "https":
+						step.addTaskLets(newBashCommand(randomUUID().toString(), format("mkdir -p %s", f.getDest())),
+								         newBashCommand(randomUUID().toString(), format("cd %s && %s %s", f.getDest(), 
+								        		 getProperty("org.excalibur.default.network.downloader", "wget --no-cookies --no-check-certificate"), f.getSource().trim())));
+						break;
+					}
+				}
+			});
+			
+			flow.add(step);
 			job.add(flow);
 		});
 		
@@ -171,10 +234,14 @@ public class JobService
 		{
 			TaskStats stats = result.stats();
 			
-			if (!result.getResult().getProcessStats().isEmpty())
-			{
-				taskStatusRepository.updateTaskPid(result.getId(), result.getResult().getProcessStats().get(0).getPid());
-			}
+//			if (!result.getResult().getProcessStats().isEmpty())
+//			{
+//				taskStatusRepository.updateTaskPid(result.getId(), result.getResult().getProcessStats().get(0).getPid());
+//			}
+			
+//			Optional<TaskStatus> running = taskStatusRepository.getStatusOfTask(result.getId(), TaskStatusType.RUNNING);
+//			Optional<TaskStatus> finished = taskStatusRepository.getStatusOfTask(result.getId(), TaskStatusType.FINISHED);
+//			long elapsed = finished.get().getDate().getTime() - running.get().getDate().getTime();
 			
 			taskCpuStatsRepository.insert(stats.getCpu());
 			taskMemoryStatsRepository.insert(stats.getMemory());
@@ -183,10 +250,38 @@ public class JobService
 					.setTaskId(result.getId())
 					.setId(randomUUID().toString())
 					.setType(TaskOutputType.SYSOUT)
-					.setValue(result.getResult().getCommandOutput());
+					.setValue(result.getOutput())
+					.setChecksum(sha256().hashString(result.getOutput(), UTF_8).toString());
 			
 			taskOutputRepository.insert(output);
 		}
+	}
+	
+	@Subscribe
+	public void updateProcessState(ProcessState ps)
+	{
+		taskStatusRepository.updateTaskPid(ps.getId(), ps.getPid());
+		
+		if (ps.getCpuState() != null)
+		{
+			taskCpuStatsRepository.insert(ps.getCpuState());
+		}
+		
+		if (ps.getMemoryState() != null)
+		{
+			ProcessMemoryState memory = ps.getMemoryState().clone()
+					.setSize(ps.getMemoryState().getSize() / pow(1000, 2))
+					.setResident(ps.getMemoryState().getResident() / pow(1000, 2))
+					.setShare(ps.getMemoryState().getShare() / pow(1000, 2));
+			
+			taskMemoryStatsRepository.insert(memory);
+		}
+	}
+	
+	@Subscribe
+	public void updateJobStatus(JobExecution jobExecution)
+	{
+		jobRepository.finished(jobExecution.getJob().getName(), now().atZone(UTC).toInstant().toEpochMilli(), jobExecution.getElapsedTime());
 	}
 	
 	
@@ -204,19 +299,27 @@ public class JobService
 	public Optional<JobStatus> getJobTaskStatuses(String jobId)
 	{
 		Optional<JobStatus> result = Optional.absent();
+		final Optional<ApplicationDescriptor> descriptor = jobRepository.findByUUID(jobId);
 		
-		List<Application> tasks = taskRepository.findAllTasksOfJob(jobId);
-		
-		if (!tasks.isEmpty())
+		if (descriptor.isPresent())
 		{
-			final JobStatus js = new JobStatus().setId(jobId);
-			tasks.forEach(t -> 
-			{
-				Optional<TaskStatus> status = taskStatusRepository.getLastStatusOfTask(t.getId());
-				js.addTaskStatus(status.orNull());
-			});
+			final JobStatus js = new JobStatus()
+					.setCpuTime(descriptor.get().getCpuTime())
+					.setId(jobId)
+					.setName(descriptor.get().getName());
 			
-			result = Optional.of(js);
+			List<Application> tasks = taskRepository.findAllTasksOfJob(jobId);
+			
+			if (!tasks.isEmpty())
+			{
+				tasks.forEach(t -> 
+				{
+					Optional<TaskStatus> status = taskStatusRepository.getLastStatusOfTask(t.getId());
+					js.addTaskStatus(status.orNull());
+				});
+				
+				result = Optional.of(js);
+			}
 		}
 		
 		return result;

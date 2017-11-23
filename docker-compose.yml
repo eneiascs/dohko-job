@@ -34,7 +34,7 @@ services:
     environment:
       JDBC_DATABASE_URL: "jdbc:mysql://mysql:3306/dohko"
     volumes:
-      - .:/opt/dohko/job
+      - /home/vagrant/workspace:/opt/dohko/job
     ports:
       - 3300:8080
       - 8000:8000

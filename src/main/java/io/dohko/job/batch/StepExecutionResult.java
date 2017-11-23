@@ -69,4 +69,14 @@ public class StepExecutionResult
 	{
 		return exception;
 	}
+	
+	public int getExitCode()
+	{
+		return getResult() != null ? getResult().getExitCode() : getException().getExitCode();
+	}
+	
+	public String getOutput()
+	{
+		return getResult() != null ? getResult().getOutput() : getException().getOutput();
+	}
 }

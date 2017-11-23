@@ -34,7 +34,7 @@ RUN yum update -y && \
     rm -rf /var/cache/yum/* && \
     rm -rf /root/.cache
 
-COPY start.sh /opt/dohko/job
+#COPY start.sh /opt/dohko/job/start.sh
 EXPOSE 8080
 EXPOSE 8000
 CMD ["/bin/bash"]

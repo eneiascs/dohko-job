@@ -14,50 +14,44 @@
  *     You should have received a copy of the GNU General Public License
  *     along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
-package io.dohko.job.batch;
+package io.dohko.job.host;
 
-import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 
-import job.flow.Job;
+import com.google.common.collect.ImmutableList;
 
-public class JobExecution 
+public enum Action 
 {
-	private final Job job;
-	private long elapsedTime;
+	UNPACK 
+	{
+		@Override
+		ImmutableList<String> params() 
+		{
+			return null;
+		}
+	},
 	
-	public JobExecution(Job job)
+	INSTALL 
 	{
-		this.job = Objects.requireNonNull(job, () -> "job is null");
-	}
+		@Override
+		ImmutableList<String> params() 
+		{
+			return null;
+		}
+	},
 	
-	public JobExecution(Job job, long elapsedTime) 
+	COPY 
 	{
-		this(job);
-		this.elapsedTime = elapsedTime;
-	}
-
-	/**
-	 * @return the elapsedTime
-	 */
-	public long getElapsedTime() 
-	{
-		return elapsedTime;
-	}
-
-	/**
-	 * @param elapsedTime the elapsedTime to set
-	 */
-	public JobExecution setElapsedTime(long elapsedTime) 
-	{
-		this.elapsedTime = elapsedTime;
-		return this;
-	}
-
-	/**
-	 * @return the job
-	 */
-	public Job getJob() 
-	{
-		return job;
-	}
+		@Override
+		ImmutableList<String> params() 
+		{
+			return null;
+		}
+	};
+	
+	private final List<String> params = new ArrayList<>();
+	
+	
+	abstract ImmutableList<String> params();
 }

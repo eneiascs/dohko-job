@@ -105,7 +105,7 @@ Vagrant.configure("2") do |config|
      yum install -y epel-release
      yum update -y 
      yum groupinstall -y 'Development Tools'
-     yum install -y curl git htop vim xauth xclock xsel wget
+     yum install -y curl bc git htop vim xauth xclock xsel wget
 
      # Install Oracle Java 8
      wget --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" \
@@ -122,8 +122,6 @@ Vagrant.configure("2") do |config|
      } >> /etc/profile.d/java.sh
 
      chown -R vagrant:vagrant /opt/java
-
-     # yum install -y java-1.8.0-openjdk java-1.8.0-openjdk-devel
 
      wget -qO- http://apache.mediamirrors.org/maven/maven-3/3.5.2/binaries/apache-maven-3.5.2-bin.tar.gz | tar xzvf - -C /opt/
      ln -s /opt/apache-maven-3.5.2 /opt/maven
