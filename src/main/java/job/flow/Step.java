@@ -20,12 +20,14 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 
 import io.airlift.command.Command;
+import io.airlift.command.CommandBuilder;
 import io.airlift.command.CommandFailedException;
 import io.airlift.command.CommandResult;
 
@@ -33,10 +35,10 @@ public class Step
 {
 	private final String id;
 	private final String name;
-	private final Command action;
+	private final CommandBuilder action;
 	private final List<Command> tasklets = new ArrayList<>();
 	
-	public Step(String id, String name, Command action)
+	public Step(String id, String name, CommandBuilder action)
 	{
 		this.id = requireNonNull(id, "Steps's id is null");
 		this.name = requireNonNull(name, "Step's name is null");
@@ -75,12 +77,12 @@ public class Step
 	/**
 	 * @return the action
 	 */
-	public Command getAction() 
+	public CommandBuilder getAction() 
 	{
 		return action;
 	}
 	
-	public Command action()
+	public CommandBuilder action()
 	{
 		return action;
 	}
@@ -105,6 +107,8 @@ public class Step
 
 	public CommandResult execute(Executor executor) throws CommandFailedException 
 	{
+		Command command = action.build();
+		
 		try 
 		{
 			for (Command task : tasklets) 
@@ -117,14 +121,40 @@ public class Step
 			e.printStackTrace();
 		}
 
-		return action.execute(executor);
+		return command.execute(executor);
+	}
+	
+	@Override
+	public boolean equals(Object obj) 
+	{
+		if (this == obj)
+		{
+			return true;
+		}
+		
+		if (obj == null || getClass() != obj.getClass())
+		{
+			return false;
+		}
+		
+		Step other = (Step) obj;
+		
+		return Objects.equals(id(), other.id()) &&
+			   Objects.equals(name(), other.name());
+	}
+	
+	@Override
+	public int hashCode() 
+	{
+		return Objects.hash(name, id) * 17;
 	}
 	
 	@Override
 	public String toString() 
 	{
 		return MoreObjects.toStringHelper(this)
-				.add("name", getName())
+				.add("name", name)
+				.add("id", id)
 				.add("command", action)
 				.omitNullValues()
 				.toString();

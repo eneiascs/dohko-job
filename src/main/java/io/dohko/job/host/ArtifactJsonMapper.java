@@ -41,7 +41,6 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 
-
 public class ArtifactJsonMapper 
 {
 	private final ObjectMapper mapper;

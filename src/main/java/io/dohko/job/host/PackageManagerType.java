@@ -18,7 +18,7 @@ package io.dohko.job.host;
 
 import com.google.common.collect.ImmutableList;
 
-import io.airlift.command.Command;
+import io.airlift.command.CommandBuilder;
 import io.airlift.command.CommandFailedException;
 import io.airlift.command.CommandResult;
 
@@ -26,10 +26,13 @@ import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.exec.OS;
+
+import static io.airlift.command.CommandBuilder.*;
 
 public enum PackageManagerType 
 {
@@ -76,7 +79,7 @@ public enum PackageManagerType
 		{
 			try 
 			{
-				CommandResult commandResult = command(packages).execute(Executors.newSingleThreadExecutor());
+				CommandResult commandResult = command(packages).build().execute(Executors.newSingleThreadExecutor());
 				result.append(commandResult.getCommandOutput());
 				
 			} catch (CommandFailedException cfe) 
@@ -88,7 +91,7 @@ public enum PackageManagerType
 		return result.toString();
 	} 
 
-	public static Command command(final List<Package> packages) 
+	public static CommandBuilder command(final List<Package> packages) 
 	{
 		PackageManagerType type = getOSPackageManager();
 		
@@ -99,8 +102,10 @@ public enum PackageManagerType
 			commandline.append(format("%s\\\n", p.getName()));
 		});
 		
-		return new Command("bash", "-c", commandline.toString())
-				   .setTimeLimit(1, TimeUnit.HOURS);
+		return newCommandBuilder()
+				.setId(UUID.randomUUID().toString())
+				.setCommands("bash", "-c", commandline.toString())
+				.setTimeout(1L, TimeUnit.HOURS);
 	}
 
 	private static PackageManagerType getOSPackageManager() 

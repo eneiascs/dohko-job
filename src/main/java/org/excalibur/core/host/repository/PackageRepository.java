@@ -17,7 +17,6 @@
 package org.excalibur.core.host.repository;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -29,6 +28,7 @@ import java.util.List;
 
 import org.excalibur.core.host.repository.PackageRepository.BindPackage.PackageBinderFactory;
 import org.excalibur.core.host.repository.PackageRepository.PackageRepositorySetMapper;
+import org.excalibur.core.json.databind.ObjectMapperUtil;
 import org.skife.jdbi.v2.SQLStatement;
 import org.skife.jdbi.v2.StatementContext;
 import org.skife.jdbi.v2.sqlobject.Bind;
@@ -40,16 +40,8 @@ import org.skife.jdbi.v2.sqlobject.SqlUpdate;
 import org.skife.jdbi.v2.sqlobject.customizers.RegisterMapper;
 import org.skife.jdbi.v2.sqlobject.customizers.SingleValueResult;
 import org.skife.jdbi.v2.tweak.ResultSetMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.guava.GuavaModule;
-import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
 import com.google.common.base.Optional;
-import com.google.common.base.Strings;
 
 import io.dohko.jdbi.stereotype.Repository;
 import io.dohko.job.host.Platform;
@@ -80,32 +72,6 @@ public interface PackageRepository extends Closeable
     {
         public static class PackageBinderFactory implements BinderFactory
         {
-        	private static final Logger LOG = LoggerFactory.getLogger(PackageBinderFactory.class);
-        	private final ObjectMapper mapper = new ObjectMapper();
-        	
-        	public PackageBinderFactory() 
-        	{
-        		mapper.registerModules(new JaxbAnnotationModule(), new GuavaModule());
-                mapper.configure(SerializationFeature.INDENT_OUTPUT, true);
-			}
-        	
-        	<T> Optional<String> writeValueAsString(T type)
-        	{
-        		Optional<String> result = Optional.absent();
-        		
-        		try 
-        		{
-					result = Optional.fromNullable(mapper.writeValueAsString(type));
-				} 
-        		catch (JsonProcessingException e) 
-        		{
-        			LOG.error("Error on serializing object [{}].", type);
-        			LOG.error("The reason is [{}]", e.getMessage(), e);
-				}
-        		
-        		return result;
-        	}
-        	
             @Override
             public Binder<BindPackage, Package> build(Annotation annotation)
             {
@@ -118,8 +84,8 @@ public interface PackageRepository extends Closeable
                         q.bind("version", arg.getVersion());
                         q.bind("architecture", arg.getArchitecture());
                         q.bind("description", arg.getDescription());
-                        q.bind("platforms", writeValueAsString(arg.getPlatform()).orNull());
-                        q.bind("dependencies", writeValueAsString(arg.getDependencies()).orNull());
+                        q.bind("platforms", new ObjectMapperUtil().writeValueAsString(arg.getPlatform()).orElse(null));
+                        q.bind("dependencies", new ObjectMapperUtil().writeValueAsString(arg.getDependencies()).orElse(null));
                     }
                 };
             }
@@ -129,33 +95,6 @@ public interface PackageRepository extends Closeable
 	
 	public class PackageRepositorySetMapper implements ResultSetMapper<Package> 
 	{
-		private final ObjectMapper mapper = new ObjectMapper();
-		
-		public PackageRepositorySetMapper()
-		{
-			mapper.registerModules(new JaxbAnnotationModule(), new GuavaModule());
-            mapper.configure(SerializationFeature.INDENT_OUTPUT, true);
-		}
-		
-		<T> Optional<T> readJsonValue(Class<T> type, String name, ResultSet r) throws SQLException
-		{
-			Optional<T> result = Optional.absent();
-			String value = r.getString(name);
-			
-			if (!r.wasNull() && !Strings.isNullOrEmpty(value))
-			{
-				try 
-				{
-					result = Optional.of(mapper.readValue(value, type));
-				} 
-				catch (IOException e) 
-				{
-				}
-			}
-			
-			return result;
-		}
-		
 		@Override
 		public Package map(int index, ResultSet r, StatementContext ctx) throws SQLException 
 		{
@@ -163,7 +102,7 @@ public interface PackageRepository extends Closeable
 					.setArchitecture(r.getString("architecture"))
 					.setDescription(r.getString("description"))
 					.setName(r.getString("name"))
-					.setPlatform(readJsonValue(Platform.class, "platforms", r).or(new Platform()));
+					.setPlatform(new ObjectMapperUtil().readJsonValue(Platform.class, "platforms", r).orElse(new Platform()));
 		}
 	}
 }

@@ -16,20 +16,26 @@
  */
 package io.dohko.job.batch;
 
+import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.commons.io.FilenameUtils;
 import org.excalibur.core.execution.domain.Application;
 import org.excalibur.core.execution.domain.ApplicationDescriptor;
+import org.excalibur.core.execution.domain.Block;
 import org.excalibur.core.execution.domain.JobStatus;
 import org.excalibur.core.execution.domain.Precondition;
 import org.excalibur.core.execution.domain.TaskOutput;
 import org.excalibur.core.execution.domain.TaskOutputType;
 import org.excalibur.core.execution.domain.TaskStats;
 import org.excalibur.core.execution.domain.TaskStatus;
+import org.excalibur.core.execution.domain.repository.BlockRepository;
 import org.excalibur.core.execution.domain.repository.JobRepository;
 import org.excalibur.core.execution.domain.repository.TaskCpuStatsRepository;
 import org.excalibur.core.execution.domain.repository.TaskMemoryStatsRepository;
@@ -37,25 +43,30 @@ import org.excalibur.core.execution.domain.repository.TaskOutputRepository;
 import org.excalibur.core.execution.domain.repository.TaskRepository;
 import org.excalibur.core.execution.domain.repository.TaskStatusRepository;
 import org.excalibur.core.host.repository.PackageRepository;
+import org.excalibur.core.json.databind.ObjectMapperUtil;
 import org.excalibur.core.util.concurrent.DynamicExecutors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.eventbus.Subscribe;
+import com.google.common.io.Files;
 
-import io.airlift.command.Command;
 import io.airlift.command.ProcessCpuState;
 import io.airlift.command.ProcessMemoryState;
 import io.airlift.command.ProcessState;
+import io.dohko.job.batch.tree.Tree;
+import io.dohko.job.batch.tree.TreeNode;
 import io.dohko.job.host.Package;
 import io.dohko.job.host.PackageManagerType;
 import job.flow.Flow;
 import job.flow.Job;
 import job.flow.Step;
 
+import static java.lang.Math.*;
 
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.hash.Hashing.sha256;
@@ -63,14 +74,15 @@ import static io.airlift.command.Command.newBashCommand;
 import static java.lang.String.format;
 import static java.lang.System.getProperty;
 import static  java.nio.charset.StandardCharsets.UTF_8;
-import static java.time.Instant.now;
 import static java.time.ZoneOffset.UTC;
 import static java.util.UUID.randomUUID;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.excalibur.core.execution.domain.TaskStatusType.PENDING;
+import static org.excalibur.core.util.SystemUtils2.getLongProperty;
+import static io.airlift.command.CommandBuilder.*;
+import static org.apache.commons.io.FilenameUtils.*;
 
-import static java.lang.Math.*;
-
+import static org.excalibur.core.util.Instants.*;
+import static org.excalibur.core.execution.domain.TaskStatus.*;
 
 @Service
 public class JobService 
@@ -83,10 +95,11 @@ public class JobService
 	private final TaskMemoryStatsRepository taskMemoryStatsRepository;
 	private final TaskOutputRepository taskOutputRepository;
 	private final PackageRepository packageRepository;
+	private final BlockRepository blockRepository;
 	private final LocalShellJobLaucher localShellJobLaucher; 
 	
 	@Autowired
-	public JobService (JobRepository jobRepository, TaskRepository taskRepository, TaskStatusRepository taskStatusRepository, TaskCpuStatsRepository taskCpuStatsRepository, TaskMemoryStatsRepository taskMemoryStatsRepository, TaskOutputRepository taskOutputRepository, PackageRepository packageRepository)
+	public JobService (JobRepository jobRepository, TaskRepository taskRepository, TaskStatusRepository taskStatusRepository, TaskCpuStatsRepository taskCpuStatsRepository, TaskMemoryStatsRepository taskMemoryStatsRepository, TaskOutputRepository taskOutputRepository, PackageRepository packageRepository, BlockRepository blockRepository)
 	{
 		this.jobRepository = jobRepository;
 		this.taskRepository = taskRepository;
@@ -95,8 +108,9 @@ public class JobService
 		this.taskMemoryStatsRepository = taskMemoryStatsRepository;
 		this.taskOutputRepository = taskOutputRepository;
 		this.packageRepository = packageRepository;
+		this.blockRepository = blockRepository;
 		
-		localShellJobLaucher = new LocalShellJobLaucher(DynamicExecutors.newListeningDynamicScalingThreadPool("job-executors"));
+		localShellJobLaucher = new LocalShellJobLaucher(DynamicExecutors.newListeningDynamicScalingThreadPool("local-shell-job-executors"));
 		localShellJobLaucher.registerListener(this);
 	}
 	
@@ -108,27 +122,121 @@ public class JobService
 			job.setId(randomUUID().toString());
 		}
 		
-		JobStatus result = new JobStatus(job.getId(), job.getName());
+		JobStatus jobStatus = new JobStatus(job.getId(), job.getName());
 		
-		jobRepository.insert(job.setCreatedIn(now().atZone(UTC).toInstant().toEpochMilli()));
+		jobRepository.insert(job.setCreatedIn(now(UTC).toEpochMilli()));
 		
-		List<Job> jobs = new ArrayList<>();
+		checkAndFixBlocksStates(job);
 		
-		jobs.add(configurePreconditions(result, job.preconditions()));
-		jobs.add(configureApplications(result, job.applications()));
+		List<Tree<Step>> applicationsExecutionTrees = createApplicationsExecutionDependencyTrees(job.applications(), jobStatus);
+		List<Tree<BlockAdapter>> blocksExecutionTrees = createBlocksExecutionDependencyTrees(job.blocks(), jobStatus);
 		
-		job.blocks().forEach(b -> jobs.add(configureApplications(result, b.applications())));
+		job.getBlocks().forEach(block -> createApplications(block.getApplications()));
 		
 		createApplications(job.applications());
-		createTaskStatuses(result.statuses());
+		createTaskStatuses(jobStatus.statuses());
+		blockRepository.insert(job.getBlocks());
 		
-//		jobs.forEach(j -> localShellJobLaucher.run(j, new JobParameters()));
-		localShellJobLaucher.run(jobs);
+		localShellJobLaucher.submitJobs(applicationsExecutionTrees);
+		localShellJobLaucher.submitBlocksToExecution(blocksExecutionTrees);
 		
-		return result;
+		return jobStatus;
 	}
 	
-	private Job configurePreconditions(JobStatus status, List<Precondition> preconditions) 
+	private List<Tree<BlockAdapter>> createBlocksExecutionDependencyTrees(Iterable<Block> blocks, JobStatus jobStatus) 
+	{
+		Map<String, TreeNode<BlockAdapter>> nodes = new HashMap<>();
+		
+		blocks.forEach(block ->
+		{
+			List<Tree<Step>> blockApps = createApplicationsExecutionDependencyTrees(block.applications(), jobStatus);
+			
+			Preconditions.checkState(!blockApps.isEmpty() && blockApps.size() == 1, "");
+			
+			if (!block.hasParents())
+			{
+				nodes.put(block.getName(), new TreeNode<BlockAdapter>(new BlockAdapter(block, blockApps.get(0))));
+			} 
+			else 
+			{
+				TreeNode<BlockAdapter> parent = null;
+				Iterator<String> iter = block.getParents().iterator();
+				while(iter.hasNext() && (parent = nodes.get(iter.next())) == null);
+				
+				assert parent != null;
+				parent.addChild(new TreeNode<>(new BlockAdapter(block, blockApps.get(0))));
+			}
+		});
+		
+		List<Tree<BlockAdapter>> trees = new ArrayList<>();
+		
+		nodes.values().forEach(node -> 
+		{
+			if (node.getParent() == null)
+			{
+				trees.add(new Tree<BlockAdapter>().setRoot(node));
+			}
+		});
+		
+		return trees;
+	}
+
+	private void checkAndFixBlocksStates(ApplicationDescriptor job) 
+	{
+		job.blocks().forEach(b -> 
+		{
+			b.setJobId(job.getId());
+			
+			if (isNullOrEmpty(b.getId()))
+			{
+				b.setId(randomUUID().toString());
+			}
+			
+			if (isNullOrEmpty(b.getName()))
+			{
+				b.setName(b.getId());
+			}
+			
+			List<Application> applications = b.applications();
+			int i = 0;
+			
+			do
+			{
+				Application application = applications.get(i);
+				
+				if (isNullOrEmpty(application.getId()))
+				{
+					application.setId(randomUUID().toString());
+				}
+				
+				if (i - 1 >= 0)
+				{
+					application.addParent(applications.get(i - 1).getName());
+				}
+				
+				application.setBlockId(b.getId());
+				application.setJobId(b.getJobId());
+				
+			} while (++i < applications.size());
+			
+			
+			
+			b.applications().forEach(application -> 
+			{
+				if (isNullOrEmpty(application.getId()))
+				{
+					application.setId(randomUUID().toString());
+				}
+				
+				application.setBlockId(b.getId());
+				application.setJobId(b.getJobId());
+			});
+			
+			b.setPlainText(new ObjectMapperUtil().toJson(b).orElse(null));
+		});
+	}
+
+	protected Job configurePreconditions(JobStatus status, List<Precondition> preconditions) 
 	{
 		Job job = new Job(format("preconditions-%s", status.getId()));
 		
@@ -154,9 +262,9 @@ public class JobService
 		return job;
 	}
 
-	protected Job configureApplications(final JobStatus jobStatus, final Iterable<Application> applications)
+	protected List<Tree<Step>> createApplicationsExecutionDependencyTrees(final Iterable<Application> applications, final JobStatus jobStatus)
 	{
-		Job job = new Job(jobStatus.getId());
+		Map<String, TreeNode<Step>> nodes = new HashMap<>();
 		
 		applications.forEach(application -> 
 		{
@@ -166,44 +274,75 @@ public class JobService
 			}
 			
 			application.setJobId(jobStatus.getId());
-			jobStatus.addTaskStatus(
-					new TaskStatus()
-					  .setDate(new Date())
-					  .setTaskId(application.getId())
-					  .setTaskName(application.getName())
-					  .setType(PENDING));
+			jobStatus.addTaskStatus(newPendingTaskStatus(application.getId(), application.getName()));
 			
-			final Flow flow = new Flow(application.getName());
+			Long timeout = application.getTimeout() == null ? getLongProperty("org.excalibur.task.default.timeout", 3600L) : application.getTimeout();
+			
 			final Step step = new Step(application.getId(), application.getName(),
-					new Command(application.getId(), "bash", "-c", application.getCommandLine())
+					newCommandBuilder().setId(application.getId()).setCommands("bash", "-c", application.getCommandLine())
 							.registerListeners(Collections.singletonList(JobService.this))
-							.setTimeLimit(application.getTimeout() == null ? 3600 : application.getTimeout(), SECONDS));
+							.setTimeout(timeout, SECONDS));
 			
-			application.getFiles().forEach(f -> 
-			{ 
-				step.action().addEnvironment(f.getName(), f.getDest());
-				
-				java.util.Optional<URI> uri = f.getSourceURI();
-				
-				if (uri.isPresent() && uri.get().getScheme() != null)
-				{
-					switch(uri.get().getScheme())
-					{
-					case "http":
-					case "https":
-						step.addTaskLets(newBashCommand(randomUUID().toString(), format("mkdir -p %s", f.getDest())),
-								         newBashCommand(randomUUID().toString(), format("cd %s && %s %s", f.getDest(), 
-								        		 getProperty("org.excalibur.default.network.downloader", "wget --no-cookies --no-check-certificate"), f.getSource().trim())));
-						break;
-					}
-				}
-			});
+			includeApplicationFilesHandler(application, step);
 			
-			flow.add(step);
-			job.add(flow);
+			if (!application.hasParents())
+			{
+				nodes.put(step.name(), new TreeNode<>(step));
+			}
+			else 
+			{
+				TreeNode<Step> parent = null;
+				Iterator<String> parents = application.parents().iterator();
+				
+				while (parents.hasNext() && (parent = nodes.get(parents.next())) == null);
+				
+				assert parent != null;
+				parent.addChild(new TreeNode<>(step));
+			}
 		});
 		
-		return job;
+		List<Tree<Step>> trees = new ArrayList<>();
+		
+		nodes.values().forEach(node -> 
+		{
+			if (node.getParent() == null)
+			{
+				trees.add(new Tree<Step>().setRoot(node));
+			}
+		});
+		
+		return trees;
+	}
+	
+	
+	private void includeApplicationFilesHandler(Application application, Step step)
+	{
+		application.getFiles().forEach(f -> 
+		{
+			String destPath = Files.simplifyPath(org.excalibur.core.io.utils.Files.expandHomePrefixReference(getFullPath(f.dest())));
+			String dest = FilenameUtils.normalize(destPath.concat(File.separator)).concat(FilenameUtils.getName(f.dest()));
+			
+			step.action().addEnviromentVariable(f.name(), dest);
+			
+			java.util.Optional<URI> uri = f.getSourceURI();
+			
+			if (uri.isPresent() && uri.get().getScheme() != null)
+			{ 
+				switch(uri.get().getScheme())
+				{
+				case "http":
+				case "https":
+					String commandline = format("mkdir -p %s && cd %s && %s %s",
+			        		 destPath,
+			        		 destPath, 
+			        		 getProperty("org.excalibur.default.network.downloader", format("wget --no-cookies --no-check-certificate -O %s", dest)), 
+			        		 f.source().trim());
+					
+					step.addTaskLets(newBashCommand(randomUUID().toString(), commandline).setDirectory(destPath).excludeEnvironmentVariables());
+					break;
+				}
+			}
+		});
 	}
 	
 	
@@ -213,6 +352,7 @@ public class JobService
 		taskRepository.insert(apps);
 	}
 	
+	@Transactional
 	public void createTaskStatuses(Iterable<TaskStatus> statuses)
 	{
 		taskStatusRepository.insert(statuses);
@@ -281,7 +421,7 @@ public class JobService
 	@Subscribe
 	public void updateJobStatus(JobExecution jobExecution)
 	{
-		jobRepository.finished(jobExecution.getJob().getName(), now().atZone(UTC).toInstant().toEpochMilli(), jobExecution.getElapsedTime());
+//		jobRepository.finished(jobExecution.getJob().getName(), now().atZone(UTC).toInstant().toEpochMilli(), jobExecution.getElapsedTime());
 	}
 	
 	
@@ -304,7 +444,6 @@ public class JobService
 		if (descriptor.isPresent())
 		{
 			final JobStatus js = new JobStatus()
-					.setCpuTime(descriptor.get().getCpuTime())
 					.setId(jobId)
 					.setName(descriptor.get().getName());
 			

@@ -21,10 +21,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.excalibur.core.Identifiable;
+
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 
-public class Flow
+public class Flow implements Identifiable<String>
 {
 	private final Map<String, Flow> parents = new ConcurrentHashMap<>();
 	private final Map<String, Step> steps =  new LinkedHashMap<>();
@@ -74,6 +76,12 @@ public class Flow
 	public String getName() 
 	{
 		return name;
+	}
+	
+	@Override
+	public String getId() 
+	{
+		return getName();
 	}
 	
 	@Override

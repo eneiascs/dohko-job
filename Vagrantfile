@@ -44,7 +44,6 @@ end
 plugins = ["vagrant-docker-compose",
   "vagrant-vbguest",
   "vagrant-proxyconf",
-  "vagrant-proxyconf",
   "vagrant-env",
   "vagrant-persistent-storage",
   "vagrant-cachier"]
