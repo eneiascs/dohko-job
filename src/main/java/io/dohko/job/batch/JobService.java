@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.FilenameUtils;
 import org.excalibur.core.execution.domain.Application;
 import org.excalibur.core.execution.domain.ApplicationDescriptor;
@@ -60,6 +61,7 @@ import io.airlift.command.ProcessMemoryState;
 import io.airlift.command.ProcessState;
 import io.dohko.job.batch.tree.Tree;
 import io.dohko.job.batch.tree.TreeNode;
+import io.dohko.job.batch.tree.TreeTraversalOrderType;
 import io.dohko.job.host.Package;
 import io.dohko.job.host.PackageManagerType;
 import job.flow.Flow;
@@ -145,40 +147,47 @@ public class JobService
 	
 	private List<Tree<BlockAdapter>> createBlocksExecutionDependencyTrees(Iterable<Block> blocks, JobStatus jobStatus) 
 	{
-		Map<String, TreeNode<BlockAdapter>> nodes = new HashMap<>();
+		Map<String, Tree<BlockAdapter>> trees = new HashMap<>();
 		
 		blocks.forEach(block ->
 		{
 			List<Tree<Step>> blockApps = createApplicationsExecutionDependencyTrees(block.applications(), jobStatus);
 			
-			Preconditions.checkState(!blockApps.isEmpty() && blockApps.size() == 1, "");
+			Preconditions.checkState(!blockApps.isEmpty() && blockApps.size() == 1, "Block tree execution has more than one root!");
 			
+			TreeNode<BlockAdapter> node = new TreeNode<BlockAdapter>(new BlockAdapter(block, blockApps.get(0)));
 			if (!block.hasParents())
 			{
-				nodes.put(block.getName(), new TreeNode<BlockAdapter>(new BlockAdapter(block, blockApps.get(0))));
+				trees.put(block.name(), new Tree<BlockAdapter>(node));
 			} 
 			else 
 			{
 				TreeNode<BlockAdapter> parent = null;
 				Iterator<String> iter = block.getParents().iterator();
-				while(iter.hasNext() && (parent = nodes.get(iter.next())) == null);
+				
+				while (parent == null && iter.hasNext())
+				{
+					String name = iter.next();
+					
+					treef: for (Tree<BlockAdapter> tree : trees.values())
+					{
+						for (TreeNode<BlockAdapter> tn: tree.build(TreeTraversalOrderType.PRE_ORDER))
+						{
+							if (name.equalsIgnoreCase(tn.getData().getBlock().name()))
+							{
+								parent = tn;
+								break treef;
+							}
+						}
+					}
+				}
 				
 				assert parent != null;
 				parent.addChild(new TreeNode<>(new BlockAdapter(block, blockApps.get(0))));
 			}
 		});
 		
-		List<Tree<BlockAdapter>> trees = new ArrayList<>();
-		
-		nodes.values().forEach(node -> 
-		{
-			if (node.getParent() == null)
-			{
-				trees.add(new Tree<BlockAdapter>().setRoot(node));
-			}
-		});
-		
-		return trees;
+		return ImmutableList.copyOf(trees.values());
 	}
 
 	private void checkAndFixBlocksStates(ApplicationDescriptor job) 
@@ -219,19 +228,6 @@ public class JobService
 				
 			} while (++i < applications.size());
 			
-			
-			
-			b.applications().forEach(application -> 
-			{
-				if (isNullOrEmpty(application.getId()))
-				{
-					application.setId(randomUUID().toString());
-				}
-				
-				application.setBlockId(b.getId());
-				application.setJobId(b.getJobId());
-			});
-			
 			b.setPlainText(new ObjectMapperUtil().toJson(b).orElse(null));
 		});
 	}
@@ -264,7 +260,7 @@ public class JobService
 
 	protected List<Tree<Step>> createApplicationsExecutionDependencyTrees(final Iterable<Application> applications, final JobStatus jobStatus)
 	{
-		Map<String, TreeNode<Step>> nodes = new HashMap<>();
+		Map<String, Tree<Step>> trees = new HashMap<>();
 		
 		applications.forEach(application -> 
 		{
@@ -285,33 +281,40 @@ public class JobService
 			
 			includeApplicationFilesHandler(application, step);
 			
+			TreeNode<Step> node = new TreeNode<>(step);
+			
 			if (!application.hasParents())
 			{
-				nodes.put(step.name(), new TreeNode<>(step));
+				trees.put(step.name(), new Tree<>(node));
 			}
 			else 
 			{
 				TreeNode<Step> parent = null;
 				Iterator<String> parents = application.parents().iterator();
 				
-				while (parents.hasNext() && (parent = nodes.get(parents.next())) == null);
+				while (parents.hasNext() && parent == null)
+				{
+					String name = parents.next(); 
+							
+					t: for (Tree<Step> tree: trees.values())
+					{
+						for (TreeNode<Step> n: tree.build(TreeTraversalOrderType.PRE_ORDER))
+						{
+							if (n.getData().name().equalsIgnoreCase(name))
+							{
+								parent = n;
+								break t;
+							}
+						}
+					}
+				}
 				
 				assert parent != null;
-				parent.addChild(new TreeNode<>(step));
+				parent.addChild(node);
 			}
 		});
 		
-		List<Tree<Step>> trees = new ArrayList<>();
-		
-		nodes.values().forEach(node -> 
-		{
-			if (node.getParent() == null)
-			{
-				trees.add(new Tree<Step>().setRoot(node));
-			}
-		});
-		
-		return trees;
+		return ImmutableList.copyOf(trees.values());
 	}
 	
 	
@@ -338,7 +341,7 @@ public class JobService
 			        		 getProperty("org.excalibur.default.network.downloader", format("wget --no-cookies --no-check-certificate -O %s", dest)), 
 			        		 f.source().trim());
 					
-					step.addTaskLets(newBashCommand(randomUUID().toString(), commandline).setDirectory(destPath).excludeEnvironmentVariables());
+					step.addTaskLets(newBashCommand(randomUUID().toString(), commandline).excludeEnvironmentVariables());
 					break;
 				}
 			}
@@ -390,10 +393,17 @@ public class JobService
 					.setTaskId(result.getId())
 					.setId(randomUUID().toString())
 					.setType(TaskOutputType.SYSOUT)
-					.setValue(result.getOutput())
+					.setValue(new String(Base64.encodeBase64(result.getOutput().getBytes())))
 					.setChecksum(sha256().hashString(result.getOutput(), UTF_8).toString());
 			
-			taskOutputRepository.insert(output);
+			try
+			{
+				taskOutputRepository.insert(output);
+			}
+			catch(Exception exception)
+			{
+				exception.printStackTrace();
+			}
 		}
 	}
 	
