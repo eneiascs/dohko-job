@@ -335,11 +335,11 @@ public class JobService
 				{
 				case "http":
 				case "https":
-					String commandline = format("mkdir -p %s && cd %s && %s %s",
-			        		 destPath,
-			        		 destPath, 
-			        		 getProperty("org.excalibur.default.network.downloader", format("wget --no-cookies --no-check-certificate -O %s", dest)), 
-			        		 f.source().trim());
+					String commandline = format("mkdir -p %s && cd %s && %s %s && chmod +x *", 
+							destPath, 
+							destPath,
+                            getProperty("org.excalibur.default.network.downloader", format("wget --no-cookies --no-check-certificate -O %s", dest)),
+                            f.source().trim());
 					
 					step.addTaskLets(newBashCommand(randomUUID().toString(), commandline).excludeEnvironmentVariables());
 					break;
