@@ -34,75 +34,77 @@ import static org.excalibur.core.execution.domain.TaskStatus.newTaskStatus;
 import static org.excalibur.core.execution.domain.TaskStatus.runningTaskStatus;
 import static org.excalibur.core.execution.domain.TaskStatusType.FAILED;
 import static org.excalibur.core.execution.domain.TaskStatusType.FINISHED;
+import static org.excalibur.core.execution.domain.TaskStatusType.CANCELLED;
 
-public class StepExecutor 
-{
+public class StepExecutor {
 	private static final Logger LOG = LoggerFactory.getLogger(StepExecutor.class);
-	
+
 	private final Step step;
 	private final Executor executor;
 	private final EventBus eventBus;
-//	private final AtomicBoolean isExecuting = new AtomicBoolean(false);
-	
-	public StepExecutor(Step task, Executor executor)
-	{
-		this(requireNonNull(task, () -> "step to execute is null"), executor, new EventBus(format("step-%s-event-bus", task.name())));
+	// private final AtomicBoolean isExecuting = new AtomicBoolean(false);
+
+	public StepExecutor(Step task, Executor executor) {
+		this(requireNonNull(task, () -> "step to execute is null"), executor,
+				new EventBus(format("step-%s-event-bus", task.name())));
 	}
-	
-	public StepExecutor(Step task, Executor executor, EventBus eventDispatcher)
-	{
+
+	public StepExecutor(Step task, Executor executor, EventBus eventDispatcher) {
 		this.step = requireNonNull(task, () -> "step to execute is null");
 		this.eventBus = requireNonNull(eventDispatcher, () -> "Event dispatcher is null");
-		this.executor = requireNonNull(executor, () -> "step's executor is null");;
+		this.executor = requireNonNull(executor, () -> "step's executor is null");
+		;
 	}
-	
-	public <L> StepExecutor registerListener(L listener)
-	{
-		if (listener != null)
-		{
+
+	public <L> StepExecutor registerListener(L listener) {
+		if (listener != null) {
 			this.eventBus.register(listener);
 		}
-		
+
 		return this;
 	}
-	
-	public StepExecutionResult execute()
-	{
+
+	public StepExecutionResult execute() {
 		StepExecutionResult result = new StepExecutionResult(step);
 
-		try 
-		{
+		try {
 			eventBus.post(runningTaskStatus(step.id(), step.name()));
-			
+
 			LOG.info("Executing the task [{},{}]", step.getId(), step.getName());
-			
+
 			result.setResult(new TaskExecutionResult(step.getId(), step.execute(executor)));
-			
-			LOG.info("Finished task [{},{}] with exitcode [{}]", step.getId(), step.getName(), result.getResult().getExitCode());
-			
-			if (LOG.isDebugEnabled())
-			{
-				LOG.debug("Task [{},{}]'s output is [{}]", step.getId(), step.getName(), result.getOutput());
-			}
-			
+
+			LOG.info("Finished task [{},{}] with exitcode [{}]", step.getId(), step.getName(),
+					result.getResult().getExitCode());
+
+			LOG.info("Task [{},{}]'s output is [{}]", step.getId(), step.getName(), result.getOutput());
+
 			eventBus.post(newTaskStatus(step.id(), step.name(), FINISHED));
 			eventBus.post(result.getResult());
-		} 
-		catch (CommandFailedException cfe) 
-		{
+		} catch (CommandFailedException cfe) {
 			result.setException(cfe);
-			
+
 			LOG.info("Task [{},{}] failed with exitcode [{}]", step.getId(), step.getName(), result.getExitCode());
-			
-			if (LOG.isDebugEnabled())
-			{
-				LOG.debug(format("The reason is %s", cfe.getOutput()), cfe);
-			}
-			
+
+			LOG.info(format("The reason is %s", cfe.getOutput()), cfe);
+
 			eventBus.post(newTaskStatus(step.id(), step.name(), FAILED));
-			eventBus.post(new TaskExecutionResult(step.getId(), new CommandResult(randomUUID().toString(), cfe.getPid() != null ? Long.valueOf(cfe.getPid().intValue()) : null, cfe.getExitCode(), cfe.getOutput(), 0L)));
+			eventBus.post(new TaskExecutionResult(step.getId(),
+					new CommandResult(randomUUID().toString(),
+							cfe.getPid() != null ? Long.valueOf(cfe.getPid().intValue()) : null, cfe.getExitCode(),
+							cfe.getOutput(), 0L)));
 		}
-		
+
+		return result;
+	}
+
+	public StepExecutionResult cancel() {
+		StepExecutionResult result = new StepExecutionResult(step);
+
+		LOG.info("Cancelling task [{},{}] ", step.getId(), step.getName());
+
+		eventBus.post(newTaskStatus(step.id(), step.name(), CANCELLED));
+
 		return result;
 	}
 }
