@@ -1,4 +1,4 @@
-version: "2"
+version: "2.2"
 
 services:
   mysqldata:
@@ -26,18 +26,17 @@ services:
       - no-new-privileges
 
   dohkojob:
-    image: dohko-job:1.0.0
-    build: .
+    image: eneiascs/dohko-job:1.0.0
     container_name: dohko-job
     links:
       - mysql:mysql
     environment:
       JDBC_DATABASE_URL: "jdbc:mysql://mysql:3306/dohko"
     volumes:
-      - /home/vagrant/workspace:/opt/dohko/job
+      - ./:/opt/dohko/job
     ports:
       - 3300:8080
-      - 8000:8000
+      - 8001:8000
     working_dir: /opt/dohko/job
     command: /bin/bash -c "/opt/dohko/job/run"
     security_opt:
