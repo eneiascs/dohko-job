@@ -16,6 +16,9 @@
  */
 package io.dohko.job.batch;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.Collections;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -49,224 +52,216 @@ import static java.util.Objects.requireNonNull;
 
 import static org.excalibur.core.util.concurrent.DynamicExecutors.*;
 
-public class LocalShellJobLaucher implements JobLauncher 
-{
+public class LocalShellJobLaucher implements JobLauncher {
+
+	private static final Logger LOG = LoggerFactory.getLogger(LocalShellJobLaucher.class);
 	private final EventBus subscribers;
 	private final Map<String, Future<?>> futures = new HashMap<>();
-	
+
 	private final ListeningExecutorService executor;
 	private final Executor eventBusExecutor;
-	
-	public LocalShellJobLaucher(ExecutorService executor)
-	{
+	private List<Tree<BlockAdapter>> remainingTrees = Collections.synchronizedList(new ArrayList<>());
+
+	public LocalShellJobLaucher(ExecutorService executor) {
 		this.executor = MoreExecutors.listeningDecorator(requireNonNull(executor, "executor is null"));
 		eventBusExecutor = new SerialExecutor(Executors.newFixedThreadPool(1));
 		subscribers = new AsyncEventBus("localjoblaucher", eventBusExecutor);
 	}
 
 	@Override
-	public <T> void registerListener(T listener) 
-	{
-		if (listener != null)
-		{
+	public <T> void registerListener(T listener) {
+		if (listener != null) {
 			subscribers.register(listener);
 		}
 	}
-	
-	public void submitJobs (List<Tree<Step>> jobs)
-	{
-		jobs.forEach(job -> 
-		{
+
+	public void submitJobs(List<Tree<Step>> jobs) {
+		jobs.forEach(job -> {
 			submitStep(job);
 		});
 	}
-	
+
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private void submitStep(Tree<Step> job) 
-	{
+	private void submitStep(Tree<Step> job) {
 		ListeningExecutorService executor = newListeningDynamicScalingThreadPool("job-executor");
-		
-		Futures2.addCallback(executor.submit(() -> 
-		{
+
+		Futures2.addCallback(executor.submit(() -> {
 			execute(job.getRoot());
-		}), new FutureCallback() 
-		{
+		}), new FutureCallback() {
 			@Override
-			public void onSuccess(Object result) 
-			{
+			public void onSuccess(Object result) {
 				executor.shutdownNow();
 			}
 
 			@Override
-			public void onFailure(Throwable t) 
-			{
+			public void onFailure(Throwable t) {
 				executor.shutdownNow();
 			}
 		});
 	}
-	
-	void execute(TreeNode<Step> task) 
-	{
+
+	void execute(TreeNode<Step> task) {
 		final Step step = task.getData();
-		ListeningExecutorService executor = newListeningDynamicScalingThreadPool(format("step-executor-%s", step.getName()));
-		ListenableFuture<StepExecutionResult> handle = executor.submit(new Callable<StepExecutionResult>() 
-		{
+		ListeningExecutorService executor = newListeningDynamicScalingThreadPool(
+				format("step-executor-%s", step.getName()));
+		ListenableFuture<StepExecutionResult> handle = executor.submit(new Callable<StepExecutionResult>() {
 			@Override
-			public StepExecutionResult call() throws Exception 
-			{
-				return new StepExecutor(step, executor)
-						.registerListener(LocalShellJobLaucher.this)
-						.execute();
+			public StepExecutionResult call() throws Exception {
+				return new StepExecutor(step, executor).registerListener(LocalShellJobLaucher.this).execute();
 			}
 		});
-		
-		Futures2.addCallback(handle, new FutureCallback<StepExecutionResult>() 
-		{
+
+		Futures2.addCallback(handle, new FutureCallback<StepExecutionResult>() {
 			@Override
-			public void onSuccess(StepExecutionResult result) 
-			{
-				if (result.isSuccessfully())
-				{
-					for (TreeNode<Step> child: task.children())
-					{
+			public void onSuccess(StepExecutionResult result) {
+				if (result.isSuccessfully()) {
+					for (TreeNode<Step> child : task.children()) {
 						execute(child);
 					}
 				}
-				
+
 				executor.shutdown();
 			}
 
 			@Override
-			public void onFailure(Throwable t) 
-			{
+			public void onFailure(Throwable t) {
 				executor.shutdown();
 			}
 		});
 	}
 
-	public void run(final Iterable<Job> jobs)
-	{
-		//TODO include one callback to update job status when all tasks have been finished
-		executor.submit(() -> 
-		{
-			for (Job job : jobs)
-			{
+	public void run(final Iterable<Job> jobs) {
+		// TODO include one callback to update job status when all tasks have
+		// been finished
+		executor.submit(() -> {
+			for (Job job : jobs) {
 				execute(job);
 			}
 		});
 	}
 
 	@Override
-	public Optional<JobExecution> run(final Job job, final JobParameters parameters) 
-	{
-		executor.submit(() -> 
-		{
+	public Optional<JobExecution> run(final Job job, final JobParameters parameters) {
+		executor.submit(() -> {
 			execute(job);
 		});
-		
-//		Futures2.addCallback(futures, callback)
-		
+
+		// Futures2.addCallback(futures, callback)
+
 		return Optional.absent();
 	}
 
-	private void execute(final Job job) 
-	{
-		List<ListenableFuture<?>> flowHandles = new ArrayList<>(); 
-		
-		final ListeningExecutorService flowExecutorService = newListeningDynamicScalingThreadPool(format("job-%s-flows-executor", job.getName()));
-		
-		// Flows can be executed in parallel, whereas their steps are executed sequentially.
-		job.flows().forEach(flow -> 
-		{
-			ListenableFuture<?> flowHandle = flowExecutorService.submit(() -> 
-			{
-				FlowExecutionResult result = new FlowExecutor(flow, newListeningDynamicScalingThreadPool(flow.getName()))
-				      .registerListener(LocalShellJobLaucher.this)
-				      .execute();
-				
+	private void execute(final Job job) {
+		List<ListenableFuture<?>> flowHandles = new ArrayList<>();
+
+		final ListeningExecutorService flowExecutorService = newListeningDynamicScalingThreadPool(
+				format("job-%s-flows-executor", job.getName()));
+
+		// Flows can be executed in parallel, whereas their steps are executed
+		// sequentially.
+		job.flows().forEach(flow -> {
+			ListenableFuture<?> flowHandle = flowExecutorService.submit(() -> {
+				FlowExecutionResult result = new FlowExecutor(flow,
+						newListeningDynamicScalingThreadPool(flow.getName()))
+								.registerListener(LocalShellJobLaucher.this).execute();
+
 				subscribers.post(result);
 			});
-			
+
 			flowHandles.add(flowHandle);
 		});
 	}
-	
+
 	@Subscribe
-	protected void postEvent(final Object event)
-	{
+	protected void postEvent(final Object event) {
 		subscribers.post(event);
 	}
-	
-	
+
 	/**
 	 * Cancel the execution the execution of all scheduled jobs.
 	 */
-	public void cancel()
-	{
+	public void cancel() {
 		futures.values().forEach(f -> f.cancel(true));
 		executor.shutdownNow();
 	}
 
-	public void submitBlocksToExecution(List<Tree<BlockAdapter>> trees) 
-	{
-		trees.forEach(tree -> 
-		{
-			TreeNode<BlockAdapter> root = tree.root();
-			scheduleBlockExecution(root);
-		});
+	public void submitBlocksToExecution(List<Tree<BlockAdapter>> trees) {
+		synchronized (remainingTrees) {
+			boolean isEmptyBefore=remainingTrees.isEmpty();
+			remainingTrees.addAll(trees);
+			if (isEmptyBefore){
+				submitRemainingBlocksToExecution();
+			}
+		}
 	}
-	
+
+	private void submitRemainingBlocksToExecution() {
+		synchronized (remainingTrees) {
+
+			if (!remainingTrees.isEmpty()) {
+				scheduleBlockExecution(remainingTrees.get(0).root());
+				remainingTrees.remove(0);
+			}
+
+		}
+	}
+
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	void scheduleBlockExecution(TreeNode<BlockAdapter> node)
-	{
+	void scheduleBlockExecution(TreeNode<BlockAdapter> node) {
 		ListeningExecutorService executor = newListeningDynamicScalingThreadPool("block-executor");
-		
-		ListenableFuture<?> future = executor.submit(() -> 
-		{
+
+		ListenableFuture<?> future = executor.submit(() -> {
 			handleBlock(node.getData(), executor);
 		});
-		
-		Futures2.addCallback(future, new FutureCallback() 
-		{
+
+		Futures2.addCallback(future, new FutureCallback() {
 			@Override
-			public void onSuccess(Object result) 
-			{
+			public void onSuccess(Object result) {
+				submitRemainingBlocksToExecution();
 				executor.shutdown();
 			}
 
 			@Override
-			public void onFailure(Throwable t) 
-			{
+			public void onFailure(Throwable t) {
+				submitRemainingBlocksToExecution();
 				executor.shutdown();
 			}
+
 		});
-		
-//		return future;
-		
+
+		// return future;
+
 	}
-	
-	void handleBlock(BlockAdapter block, ListeningExecutorService executor)
-	{
-		for (int i = 0; i < block.getBlock().getRepeat(); i++)
-		{
+
+	void handleBlock(BlockAdapter block, ListeningExecutorService executor) {
+		for (int i = 0; i < block.getBlock().getRepeat(); i++) {
 			handle(block.getApplicationTree().root());
 		}
 	}
-	
-	StepExecutionResult handle(TreeNode<Step> node)
-	{
-		StepExecutionResult result = new StepExecutor(node.getData(), executor)
-				.registerListener(this)
-				.execute();
-		
-		if (result.isSuccessfully())
-		{
-			for (TreeNode<Step> child: node.children())
-			{
+
+	StepExecutionResult handle(TreeNode<Step> node) {
+		StepExecutionResult result = new StepExecutor(node.getData(), executor).registerListener(this).execute();
+
+		if (result.isSuccessfully()) {
+			for (TreeNode<Step> child : node.children()) {
 				handle(child);
+				
 			}
+		}else {
+			for (TreeNode<Step> child : node.children()) {
+				cancel(child);
+				
+			}
+			
 		}
-		
+
 		return result;
+	}
+	void cancel(TreeNode<Step> node){
+		StepExecutionResult result = new StepExecutor(node.getData(), executor).registerListener(this).cancel();
+		for (TreeNode<Step> child : node.children()) {
+			cancel(child);
+			
+		}
 	}
 }
