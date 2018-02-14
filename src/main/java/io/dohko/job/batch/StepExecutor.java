@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.eventbus.EventBus;
 
 import io.airlift.command.CommandFailedException;
+import io.airlift.command.CommandTimeoutException;
 import io.airlift.command.CommandResult;
 import job.flow.Step;
 
@@ -81,7 +82,14 @@ public class StepExecutor {
 
 			eventBus.post(newTaskStatus(step.id(), step.name(), FINISHED));
 			eventBus.post(result.getResult());
-		} catch (CommandFailedException cfe) {
+		}catch (CommandTimeoutException cfe) {
+			
+			LOG.info("Task [{},{}] timeout", step.getId(), step.getName());
+			eventBus.post(newTaskStatus(step.id(), step.name(), FAILED));
+			
+		}	
+		
+		catch (CommandFailedException cfe) {
 			result.setException(cfe);
 
 			LOG.info("Task [{},{}] failed with exitcode [{}]", step.getId(), step.getName(), result.getExitCode());
