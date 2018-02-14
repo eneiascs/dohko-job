@@ -26,6 +26,13 @@
 	</properties>
 
 	<repositories>
+	<repository>
+		<id>eneiascs-snapshot-repository</id>
+		<url>https://github.com/eneiascs/maven-repository/raw/master/snapshots</url>
+		<snapshots>
+			<enabled>true</enabled>
+		</snapshots>
+	</repository>
 		<repository>
 			<id>github-snapshot-repo</id>
 			<url>https://github.com/alessandroleite/maven-repository/raw/master/snapshots</url>
@@ -68,7 +75,6 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-
 		<dependency>
 			<groupId>org.excalibur</groupId>
 			<artifactId>excalibur-core</artifactId>
@@ -242,6 +248,7 @@
 		<dependency>
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
+			<version>5.1.45</version>
 		</dependency>
 
 		<dependency>
