@@ -34,8 +34,13 @@ RUN yum update -y && \
     rm -rf /var/cache/yum/* && \
     rm -rf /root/.cache
 RUN yum install -y time
+RUN yum install -y cron
 COPY run /opt/dohko/job/run
+COPY removeTemp.sh /opt/dohko/job/removeTemp.sh
+RUN touch /var/log/cron.log
+RUN (crontab -l ; echo "0/5 * * * * /opt/dohko/job/removeTemp.sh >> /var/log/cron.log") | crontab 
 COPY target /opt/dohko/job/target
 EXPOSE 8080
 EXPOSE 8000
+CMD ["cron"]
 CMD ["/bin/bash"]
