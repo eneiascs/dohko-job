@@ -23,24 +23,13 @@ RUN yum update -y && \
        echo 'export MAVEN_HOME=/opt/maven' ; \
        echo 'export PATH=$PATH:$MAVEN_HOME/bin' ; \
     } >> /etc/profile.d/maven.sh && \
-    # git clone https://github.com/dohko-io/dohko-job.git && \
-    # cd dohko-job && mvn clean package && \
-    # export DOHKO_JOB_HOME=/opt/dohko/job && \
-    # mkdir -p ${DOHKO_JOB_HOME} && \
-    # mv target/excalibur-job-1.0.0-SNAPSHOT.jar ${DOHKO_JOB_HOME} && \
-    # rm -rf ~/.m2 && \
     yum clean all && \
     rm -rf /tmp/* && \
     rm -rf /var/cache/yum/* && \
     rm -rf /root/.cache
 RUN yum install -y time
-RUN yum install -y cron
 COPY run /opt/dohko/job/run
-COPY removeTemp.sh /opt/dohko/job/removeTemp.sh
-RUN touch /var/log/cron.log
-RUN (crontab -l ; echo "0/5 * * * * /opt/dohko/job/removeTemp.sh >> /var/log/cron.log") | crontab 
 COPY target /opt/dohko/job/target
 EXPOSE 8080
 EXPOSE 8000
-CMD ["cron"]
 CMD ["/bin/bash"]

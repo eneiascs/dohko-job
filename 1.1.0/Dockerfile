@@ -1,6 +1,6 @@
 FROM eneiascs/dohko-job:1.0.0
-
-RUN chkconfig crond on
-RUN touch /var/log/cron.log
-RUN (crontab -l ; echo "*/5 * * * * /opt/dohko/job/removeTemp.sh >> /var/log/cron.log") | crontab
+ENV JAVA_HOME="/opt/java"
+COPY target /opt/dohko/job/target
+EXPOSE 8080
+EXPOSE 8000
 CMD ["/bin/bash"]

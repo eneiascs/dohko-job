@@ -279,6 +279,7 @@ public class JobService
 							.registerListeners(Collections.singletonList(JobService.this))
 							.setTimeout(timeout, SECONDS));
 			
+			includeCleanTmp(step);
 			includeApplicationFilesHandler(application, step);
 			
 			TreeNode<Step> node = new TreeNode<>(step);
@@ -317,6 +318,15 @@ public class JobService
 		return ImmutableList.copyOf(trees.values());
 	}
 	
+	private void includeCleanTmp(Step step)
+	{
+							
+		step.addTaskLets(newBashCommand(randomUUID().toString(), "find /tmp -mindepth 1 -mmin +60 -delete").excludeEnvironmentVariables());
+					
+	}
+	
+
+
 	
 	private void includeApplicationFilesHandler(Application application, Step step)
 	{
