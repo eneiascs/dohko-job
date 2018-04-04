@@ -8,11 +8,11 @@ RUN yum update -y && \
     yum update -y && \
     yum install -y curl bc git htop sysstat vim xauth xclock xsel wget && \
     wget --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" \
-       http://download.oracle.com/otn-pub/java/jdk/8u152-b16/aa0333dd3019491ca4f6ddbe78cdb6d0/jdk-8u152-linux-x64.tar.gz && \
-    sha256sum jdk-8u152-linux-x64.tar.gz | awk '$1=="218b3b340c3f6d05d940b817d0270dfe0cfd657a636bad074dcabe0c111961bf"{print "Valid Oracle JDK checksum"}' && \
-    tar xzvf jdk-8u152-linux-x64.tar.gz -C /opt && \
-    ln -s /opt/jdk1.8.0_152 /opt/java && \
-    rm -f jdk-8u152-linux-x64.tar.gz && \
+        http://download.oracle.com/otn-pub/java/jdk/8u162-b12/0da788060d494f5095bf8624735fa2f1/jdk-8u162-linux-x64.tar.gz && \
+    sha256sum jdk-8u162-linux-x64.tar.gz | awk '$1=="68ec82d47fd9c2b8eb84225b6db398a72008285fafc98631b1ff8d2229680257"{print "Valid Oracle JDK checksum"}' && \
+    tar xzvf jdk-8u162-linux-x64.tar.gz -C /opt && \
+    ln -s jdk-8u162-linux-x64.tar.gz /opt/java && \
+    rm -f jdk-8u162-linux-x64.tar.gz && \
     { \
        echo 'export JAVA_HOME=/opt/java' ; \
        echo 'export PATH=$PATH:$JAVA_HOME/bin' ; \
@@ -23,11 +23,11 @@ RUN yum update -y && \
        echo 'export MAVEN_HOME=/opt/maven' ; \
        echo 'export PATH=$PATH:$MAVEN_HOME/bin' ; \
     } >> /etc/profile.d/maven.sh && \
+    yum install -y time \
     yum clean all && \
     rm -rf /tmp/* && \
     rm -rf /var/cache/yum/* && \
-    rm -rf /root/.cache
-RUN yum install -y time
+    rm -rf /root/.cache 
 COPY run /opt/dohko/job/run
 COPY target /opt/dohko/job/target
 EXPOSE 8080
