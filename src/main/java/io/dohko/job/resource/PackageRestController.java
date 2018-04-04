@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-
+import org.springframework.beans.factory.annotation.Autowired;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 
@@ -35,7 +35,8 @@ import io.dohko.job.host.Package;
 @RequestMapping(value = "/{username}/packages")
 @Api(value = "packages", tags = "Packages Management API")
 public class PackageRestController 
-{
+{	
+	@Autowired
 	private PackageRepository packageRepository;
 	
 	@RequestMapping(method = RequestMethod.POST, produces = {"application/json"})

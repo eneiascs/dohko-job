@@ -17,6 +17,8 @@
 package io.dohko.job.batch;
 
 import java.util.concurrent.Executor;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,6 +77,16 @@ public class StepExecutor {
 
 			result.setResult(new TaskExecutionResult(step.getId(), step.execute(executor)));
 
+			final String regex = "exitcode= *(\\d+\\.?\\d*)";
+
+			final Pattern pattern = Pattern.compile(regex);
+			final Matcher matcher = pattern.matcher(result.getOutput());
+			if (matcher.find() && matcher.groupCount() >= 1 && !"0".equals(matcher.group(1))) {
+				
+				throw new CommandFailedException(step.getAction().build(), Integer.parseInt(matcher.group(1)), null,
+						result.getOutput());
+			}
+
 			LOG.info("Finished task [{},{}] with exitcode [{}]", step.getId(), step.getName(),
 					result.getResult().getExitCode());
 
@@ -82,17 +94,17 @@ public class StepExecutor {
 
 			eventBus.post(newTaskStatus(step.id(), step.name(), FINISHED));
 			eventBus.post(result.getResult());
-		}catch (CommandTimeoutException cfe) {
-			
+		} catch (CommandTimeoutException cfe) {
+
 			LOG.info("Task [{},{}] timeout", step.getId(), step.getName());
 			eventBus.post(newTaskStatus(step.id(), step.name(), FAILED));
-			
-		}	
-		
+
+		}
+
 		catch (CommandFailedException cfe) {
-			result.setException(cfe);
 
 			LOG.info("Task [{},{}] failed with exitcode [{}]", step.getId(), step.getName(), result.getExitCode());
+			result.setException(cfe);
 
 			LOG.info(format("The reason is %s", cfe.getOutput()), cfe);
 
