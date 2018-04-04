@@ -64,6 +64,12 @@
 	</dependencyManagement>
 
 	<dependencies>
+		 <dependency>
+        <groupId>io.airlift</groupId>
+        <artifactId>command</artifactId>
+        <version>0.5.1-SNAPSHOT</version>
+      </dependency>
+		
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
@@ -245,11 +251,7 @@
 			<artifactId>mariadb-java-client</artifactId>
 		</dependency> -->
 
-		<dependency>
-			<groupId>mysql</groupId>
-			<artifactId>mysql-connector-java</artifactId>
-			<version>5.1.45</version>
-		</dependency>
+	
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -294,3 +296,4 @@
 	</pluginRepositories>
 
 </project>
+
