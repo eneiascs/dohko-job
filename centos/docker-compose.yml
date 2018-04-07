@@ -1,0 +1,43 @@
+version: "2.2"
+
+services:
+  mysqldata:
+     image: busybox:1.27
+     container_name: mysql-data
+     command: "echo Data-only container for MySQL"
+     volumes:
+       - /var/lib/mysql
+     security_opt:
+       - no-new-privileges
+
+  mysql:
+    image: mysql:5.7
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: "MevgXuuNIP4Vgs+YtTyq6A71KnZSzsZJgCF1ynDT1GM="
+      MYSQL_DATABASE: dohko
+      MYSQL_USER: dohko
+      MYSQL_PASSWORD: "znntSsYTV+6HN3fmueF9QxKtX/ooBTzvRubWMAKevFY="
+    ports:
+      - "3306:3306"
+    volumes_from:
+      - mysqldata
+    security_opt:
+      - no-new-privileges
+
+  dohkojob:
+    image: eneiascs/dohko-job-centos:1.0.0
+    container_name: dohko-job
+    links:
+      - mysql:mysql
+    environment:
+      JDBC_DATABASE_URL: "jdbc:mysql://mysql:3306/dohko"
+    volumes:
+      - ./:/opt/dohko/job
+    ports:
+      - 3300:8080
+      - 8001:8000
+    working_dir: /opt/dohko/job
+    command: /bin/bash -c "/opt/dohko/job/run"
+    security_opt:
+      - no-new-privileges

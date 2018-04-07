@@ -26,7 +26,7 @@ services:
       - no-new-privileges
 
   dohkojob:
-    image: eneiascs/dohko-job:1.0.0
+    image: eneiascs/dohko-job-ubuntu:1.0.0
     container_name: dohko-job
     links:
       - mysql:mysql
