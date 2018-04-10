@@ -26,13 +26,13 @@
 	</properties>
 
 	<repositories>
-	<repository>
-		<id>eneiascs-snapshot-repository</id>
-		<url>https://github.com/eneiascs/maven-repository/raw/master/snapshots</url>
-		<snapshots>
-			<enabled>true</enabled>
-		</snapshots>
-	</repository>
+		<repository>
+			<id>eneiascs-snapshot-repository</id>
+			<url>https://github.com/eneiascs/maven-repository/raw/master/snapshots</url>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
 		<repository>
 			<id>github-snapshot-repo</id>
 			<url>https://github.com/alessandroleite/maven-repository/raw/master/snapshots</url>
@@ -240,15 +240,13 @@
 			<artifactId>jackson-datatype-guava</artifactId>
 		</dependency>
 
-		<!-- <dependency>
-			<groupId>org.mariadb.jdbc</groupId>
-			<artifactId>mariadb-java-client</artifactId>
-		</dependency> -->
+		<!-- <dependency> <groupId>org.mariadb.jdbc</groupId> <artifactId>mariadb-java-client</artifactId> 
+			</dependency> -->
 		<dependency>
-       			 <groupId>io.airlift</groupId>
-       			 <artifactId>command</artifactId>
-       			 <version>0.5.1-SNAPSHOT</version>
-     		 </dependency>
+			<groupId>io.airlift</groupId>
+			<artifactId>command</artifactId>
+			<version>0.5.1-SNAPSHOT</version>
+		</dependency>
 		<dependency>
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
@@ -265,6 +263,18 @@
 			<groupId>org.jsoftbiz</groupId>
 			<artifactId>os-platform-finder</artifactId>
 			<version>${os-platform-finder.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-websocket</artifactId>
+
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-messaging</artifactId>
+
 		</dependency>
 
 	</dependencies>

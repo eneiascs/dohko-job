@@ -46,6 +46,8 @@ import org.excalibur.core.execution.domain.repository.TaskStatusRepository;
 import org.excalibur.core.host.repository.PackageRepository;
 import org.excalibur.core.json.databind.ObjectMapperUtil;
 import org.excalibur.core.util.concurrent.DynamicExecutors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -87,6 +89,7 @@ import static org.excalibur.core.execution.domain.TaskStatus.*;
 
 @Service
 public class JobService {
+	private static final Logger LOG = LoggerFactory.getLogger(JobService.class);
 	private final JobRepository jobRepository;
 
 	private final TaskRepository taskRepository;
@@ -97,12 +100,12 @@ public class JobService {
 	private final PackageRepository packageRepository;
 	private final BlockRepository blockRepository;
 	private final LocalShellJobLaucher localShellJobLaucher;
- 
+	private final NotificationService notificationService;
 	@Autowired
 	public JobService(JobRepository jobRepository, TaskRepository taskRepository,
 			TaskStatusRepository taskStatusRepository, TaskCpuStatsRepository taskCpuStatsRepository,
 			TaskMemoryStatsRepository taskMemoryStatsRepository, TaskOutputRepository taskOutputRepository,
-			PackageRepository packageRepository, BlockRepository blockRepository) {
+			PackageRepository packageRepository, BlockRepository blockRepository, NotificationService notificationService) {
 		this.jobRepository = jobRepository;
 		this.taskRepository = taskRepository;
 		this.taskStatusRepository = taskStatusRepository;
@@ -111,6 +114,7 @@ public class JobService {
 		this.taskOutputRepository = taskOutputRepository;
 		this.packageRepository = packageRepository;
 		this.blockRepository = blockRepository;
+		this.notificationService=notificationService;
 
 		localShellJobLaucher = new LocalShellJobLaucher(
 				DynamicExecutors.newListeningDynamicScalingThreadPool("local-shell-job-executors"));
@@ -333,33 +337,14 @@ public class JobService {
 	@Subscribe
 	public void createTaskStatus(final TaskStatus status) {
 		if (status != null) {
-			taskStatusRepository.insert(status);
+			taskStatusRepository.insert(status);			
 		}
 	}
 
 	@Subscribe
 	public void updateExecutionResult(TaskExecutionResult result) {
 		if (result != null) {
-			TaskStats stats = result.stats();
-
-			// if (!result.getResult().getProcessStats().isEmpty())
-			// {
-			// taskStatusRepository.updateTaskPid(result.getId(),
-			// result.getResult().getProcessStats().get(0).getPid());
-			// }
-
-			// Optional<TaskStatus> running =
-			// taskStatusRepository.getStatusOfTask(result.getId(),
-			// TaskStatusType.RUNNING);
-			// Optional<TaskStatus> finished =
-			// taskStatusRepository.getStatusOfTask(result.getId(),
-			// TaskStatusType.FINISHED);
-			// long elapsed = finished.get().getDate().getTime() -
-			// running.get().getDate().getTime();
-
-			taskCpuStatsRepository.insert(stats.getCpu());
-			taskMemoryStatsRepository.insert(stats.getMemory());
-
+		
 			TaskOutput output = new TaskOutput().setTaskId(result.getId()).setId(randomUUID().toString())
 					.setType(TaskOutputType.SYSOUT)
 					.setValue(new String(Base64.encodeBase64(result.getOutput().getBytes())))
@@ -373,6 +358,14 @@ public class JobService {
 		}
 	}
 
+	@Subscribe
+	public void notifyTaskOutput(TaskMessage message) {
+		if (message != null) {
+		
+			notificationService.notify(message);
+		}
+	}
+	
 	@Subscribe
 	public void updateProcessState(ProcessState ps) {
 		taskStatusRepository.updateTaskPid(ps.getId(), ps.getPid());
@@ -393,9 +386,7 @@ public class JobService {
 
 	@Subscribe
 	public void updateJobStatus(JobExecution jobExecution) {
-		// jobRepository.finished(jobExecution.getJob().getName(),
-		// now().atZone(UTC).toInstant().toEpochMilli(),
-		// jobExecution.getElapsedTime());
+		LOG.info("Job finished");
 	}
 
 	public Optional<TaskStatus> lastTaskStatus(String taskId) {

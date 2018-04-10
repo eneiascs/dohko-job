@@ -1,4 +1,4 @@
-UBUNTU_IMAGE_NAME="eneiascs/dohko-job-ubuntu:1.0.0"
+UBUNTU_IMAGE_NAME="eneiascs/dohko-job-ubuntu:1.1.0"
 CENTOS_IMAGE_NAME="eneiascs/dohko-job-centos:1.0.0"
 
 create-ubuntu:

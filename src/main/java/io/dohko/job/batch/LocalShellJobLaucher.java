@@ -202,6 +202,7 @@ public class LocalShellJobLaucher implements JobLauncher {
 				scheduleBlockExecution(remainingTrees.get(0).root());
 				remainingTrees.remove(0);
 			}
+		
 
 		}
 	}
@@ -212,6 +213,7 @@ public class LocalShellJobLaucher implements JobLauncher {
 
 		ListenableFuture<?> future = executor.submit(() -> {
 			handleBlock(node.getData(), executor);
+			
 		});
 
 		Futures2.addCallback(future, new FutureCallback() {
@@ -254,7 +256,7 @@ public class LocalShellJobLaucher implements JobLauncher {
 			}
 			
 		}
-
+		
 		return result;
 	}
 	void cancel(TreeNode<Step> node){

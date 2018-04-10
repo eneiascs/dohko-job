@@ -20,6 +20,7 @@ import java.util.concurrent.Executor;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.excalibur.core.execution.domain.TaskStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,8 +72,10 @@ public class StepExecutor {
 		StepExecutionResult result = new StepExecutionResult(step);
 
 		try {
-			eventBus.post(runningTaskStatus(step.id(), step.name()));
-
+			TaskStatus runningTaskStatus = runningTaskStatus(step.id(), step.name());
+			eventBus.post(runningTaskStatus);
+			eventBus.post(new TaskMessage(runningTaskStatus.getType(),null,runningTaskStatus.getDate()));
+			
 			LOG.info("Executing the task [{},{}]", step.getId(), step.getName());
 
 			result.setResult(new TaskExecutionResult(step.getId(), step.execute(executor)));
@@ -88,12 +91,18 @@ public class StepExecutor {
 
 			LOG.info("Task [{},{}]'s output is [{}]", step.getId(), step.getName(), result.getOutput());
 
-			eventBus.post(newTaskStatus(step.id(), step.name(), FINISHED));
+			TaskStatus finishedStatus = newTaskStatus(step.id(), step.name(), FINISHED);
+			eventBus.post(finishedStatus);
 			eventBus.post(result.getResult());
+			eventBus.post(new TaskMessage(finishedStatus.getType(),result.getResult().getOutput(),finishedStatus.getDate()));
+			
+			
 		} catch (CommandTimeoutException cfe) {
 
 			LOG.info("Task [{},{}] timeout", step.getId(), step.getName());
-			eventBus.post(newTaskStatus(step.id(), step.name(), FAILED));
+			TaskStatus taskStatus=newTaskStatus(step.id(), step.name(), FAILED);
+			eventBus.post(taskStatus);
+			eventBus.post(new TaskMessage(taskStatus.getType(),result.getResult().getOutput(),taskStatus.getDate()));
 
 		}
 
@@ -103,12 +112,13 @@ public class StepExecutor {
 			result.setException(cfe);
 
 			LOG.info(format("The reason is %s", cfe.getOutput()), cfe);
-
-			eventBus.post(newTaskStatus(step.id(), step.name(), FAILED));
+			TaskStatus taskStatus=newTaskStatus(step.id(), step.name(), FAILED);
+			eventBus.post(taskStatus);
 			eventBus.post(new TaskExecutionResult(step.getId(),
 					new CommandResult(randomUUID().toString(),
 							cfe.getPid() != null ? Long.valueOf(cfe.getPid().intValue()) : null, cfe.getExitCode(),
 							cfe.getOutput(), 0L)));
+			eventBus.post(new TaskMessage(taskStatus.getType(),cfe.getOutput(),taskStatus.getDate()));
 		}
 
 		return result;
