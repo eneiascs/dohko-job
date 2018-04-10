@@ -76,19 +76,15 @@ public class StepExecutor {
 			LOG.info("Executing the task [{},{}]", step.getId(), step.getName());
 
 			result.setResult(new TaskExecutionResult(step.getId(), step.execute(executor)));
-
-			final String regex = "exitcode= *(\\d+\\.?\\d*)";
-
-			final Pattern pattern = Pattern.compile(regex);
-			final Matcher matcher = pattern.matcher(result.getOutput());
-			if (matcher.find() && matcher.groupCount() >= 1 && !"0".equals(matcher.group(1))) {
+			Integer exitCode = isTimeout(result.getOutput()) ? 9 : Integer.parseInt(getExitCode(result.getOutput()));
+			if (isError(result.getOutput())||isTimeout(result.getOutput())) {
 				
-				throw new CommandFailedException(step.getAction().build(), Integer.parseInt(matcher.group(1)), null,
+				throw new CommandFailedException(step.getAction().build(), exitCode, null,
 						result.getOutput());
 			}
 
 			LOG.info("Finished task [{},{}] with exitcode [{}]", step.getId(), step.getName(),
-					result.getResult().getExitCode());
+					exitCode);
 
 			LOG.info("Task [{},{}]'s output is [{}]", step.getId(), step.getName(), result.getOutput());
 
@@ -102,8 +98,8 @@ public class StepExecutor {
 		}
 
 		catch (CommandFailedException cfe) {
-
-			LOG.info("Task [{},{}] failed with exitcode [{}]", step.getId(), step.getName(), result.getExitCode());
+			
+			LOG.info("Task [{},{}] failed with exitcode [{}]", step.getId(), step.getName(), cfe.getExitCode());
 			result.setException(cfe);
 
 			LOG.info(format("The reason is %s", cfe.getOutput()), cfe);
@@ -116,6 +112,46 @@ public class StepExecutor {
 		}
 
 		return result;
+	}
+
+	
+	private boolean isTimeout(String output) {
+		final String timeoutRegex = "walltimelimit *(\\d+\\.?\\d*)";
+		final Pattern timeoutPattern = Pattern.compile(timeoutRegex);
+		final Matcher timeoutMatcher = timeoutPattern.matcher(step.getAction().build().getCommand().toString());
+		Double timeout=new Double(3600);
+		if (timeoutMatcher.find() && timeoutMatcher.groupCount()>0){
+			timeout=new Double(timeoutMatcher.group(1));		
+		}
+		Double walltime=new Double(0);
+		final String walltimeRegex = "walltime= *(\\d+\\.?\\d*)";
+		final Pattern walltimePattern = Pattern.compile(walltimeRegex);
+		final Matcher walltimeMatcher = walltimePattern.matcher(output);
+		if (walltimeMatcher.find() && walltimeMatcher.groupCount()>0){
+			walltime=new Double(walltimeMatcher.group(1));
+			
+		}
+		LOG.info("Command: {}",step.getAction().build().getCommand().toString());
+		LOG.info("Output: {}",output);
+		LOG.info("Timeout: {}",timeout);
+		LOG.info("walltime: {}",walltime);
+		return walltime.compareTo(timeout)>0;
+	}
+
+	private String getExitCode(String output) {
+		final String exitcodeRegex = "exitcode= *(\\d+\\.?\\d*)";
+		final Pattern exitcodePattern = Pattern.compile(exitcodeRegex);
+		final Matcher exitcodeMatcher = exitcodePattern.matcher(output);
+		if (exitcodeMatcher.find() && exitcodeMatcher.groupCount() >0)
+			return exitcodeMatcher.group(1);
+		else return null;
+		
+	}
+
+	
+	private boolean isError(final String output) {
+		
+		return !"0".equals(getExitCode(output));
 	}
 
 	public StepExecutionResult cancel() {
