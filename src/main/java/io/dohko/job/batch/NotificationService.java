@@ -16,18 +16,19 @@
  */
 package io.dohko.job.batch;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+
+import io.dohko.job.resource.NotificationHandler;
 
 @Service
 public class NotificationService {
-	@Autowired
-	private SimpMessagingTemplate brokerMessagingTemplate;
+
 
 	
 	public void notify(TaskMessage message) {
-		brokerMessagingTemplate.convertAndSend("/topic/tasks", message);
+	
+		
+		NotificationHandler.broadcast(message);
 
 	}
 

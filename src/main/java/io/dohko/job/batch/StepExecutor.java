@@ -74,7 +74,7 @@ public class StepExecutor {
 		try {
 			TaskStatus runningTaskStatus = runningTaskStatus(step.id(), step.name());
 			eventBus.post(runningTaskStatus);
-			eventBus.post(new TaskMessage(runningTaskStatus.getType(),null,runningTaskStatus.getDate()));
+			eventBus.post(new TaskMessage(runningTaskStatus.getTaskId(),runningTaskStatus.getType(),null,runningTaskStatus.getDate()));
 			
 			LOG.info("Executing the task [{},{}]", step.getId(), step.getName());
 
@@ -94,7 +94,7 @@ public class StepExecutor {
 			TaskStatus finishedStatus = newTaskStatus(step.id(), step.name(), FINISHED);
 			eventBus.post(finishedStatus);
 			eventBus.post(result.getResult());
-			eventBus.post(new TaskMessage(finishedStatus.getType(),result.getResult().getOutput(),finishedStatus.getDate()));
+			eventBus.post(new TaskMessage(finishedStatus.getTaskId(),finishedStatus.getType(),result.getResult().getOutput(),finishedStatus.getDate()));
 			
 			
 		} catch (CommandTimeoutException cfe) {
@@ -102,7 +102,7 @@ public class StepExecutor {
 			LOG.info("Task [{},{}] timeout", step.getId(), step.getName());
 			TaskStatus taskStatus=newTaskStatus(step.id(), step.name(), FAILED);
 			eventBus.post(taskStatus);
-			eventBus.post(new TaskMessage(taskStatus.getType(),result.getResult().getOutput(),taskStatus.getDate()));
+			eventBus.post(new TaskMessage(taskStatus.getTaskId(),taskStatus.getType(),result.getResult().getOutput(),taskStatus.getDate()));
 
 		}
 
@@ -118,7 +118,7 @@ public class StepExecutor {
 					new CommandResult(randomUUID().toString(),
 							cfe.getPid() != null ? Long.valueOf(cfe.getPid().intValue()) : null, cfe.getExitCode(),
 							cfe.getOutput(), 0L)));
-			eventBus.post(new TaskMessage(taskStatus.getType(),cfe.getOutput(),taskStatus.getDate()));
+			eventBus.post(new TaskMessage(taskStatus.getTaskId(),taskStatus.getType(),cfe.getOutput(),taskStatus.getDate()));
 		}
 
 		return result;
