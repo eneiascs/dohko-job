@@ -22,6 +22,7 @@ import org.excalibur.core.execution.domain.TaskStatusType;
 
 public class TaskMessage {
 	private String taskId;
+	private String taskName;
 	private TaskStatusType status;
 	private String output;
 	private Date date;
@@ -30,7 +31,7 @@ public class TaskMessage {
 		
 	}
 	
-	public TaskMessage(String taskId,TaskStatusType status, String output,Date date) {
+	public TaskMessage(String taskId,String taskName,TaskStatusType status, String output,Date date) {
 		super();
 		this.taskId=taskId;
 		this.status = status;
@@ -67,10 +68,19 @@ public class TaskMessage {
 		this.taskId = taskId;
 	}
 	
+	
+
+	public String getTaskName() {
+		return taskName;
+	}
+
+	public void setTaskName(String taskName) {
+		this.taskName = taskName;
+	}
+
 	@Override
 	public String toString() {
 		return "TaskMessage [status=" + status.getName() + ", output=" + output + "]";
 	}
-
 	
 }
