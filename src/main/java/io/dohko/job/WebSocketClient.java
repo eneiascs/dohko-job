@@ -18,19 +18,12 @@ package io.dohko.job;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.lang.reflect.Type;
 import java.net.URI;
 
 import javax.websocket.ContainerProvider;
 import javax.websocket.Session;
 import javax.websocket.WebSocketContainer;
 
-import org.springframework.messaging.simp.stomp.StompFrameHandler;
-import org.springframework.messaging.simp.stomp.StompHeaders;
-import org.springframework.messaging.simp.stomp.StompSession;
-import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
-
-import io.dohko.job.batch.TaskMessage;
 import io.dohko.job.client.NotificationClientEndpoint;
 
 public class WebSocketClient {
