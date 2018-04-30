@@ -11,7 +11,7 @@
 export PATH=${JAVA_HOME}/bin:$PATH
 
 java -Xdebug -agentlib:jdwp=transport=dt_socket,server=y,address=${DEBUGGING_PORT},suspend=n \
-     -cp target/excalibur-job-1.0.0-SNAPSHOT.jar \
+     -cp target/excalibur-job-1.1.0-SNAPSHOT.jar \
      -Duser.timezone=UTC \
      -Dorg.excalibur.jdbc.driver.class.name=${JDBC_DRIVER_CLASS} \
      -Dorg.excalibur.jdbc.url=${JDBC_DATABASE_URL} \
