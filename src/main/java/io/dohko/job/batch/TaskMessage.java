@@ -34,6 +34,7 @@ public class TaskMessage {
 	public TaskMessage(String taskId,String taskName,TaskStatusType status, String output,Date date) {
 		super();
 		this.taskId=taskId;
+		this.taskName = taskName;
 		this.status = status;
 		this.output = output;
 		this.date = date;
