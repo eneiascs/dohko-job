@@ -3,7 +3,7 @@ CENTOS_IMAGE_NAME="eneiascs/dohko-job-centos:1.0.0"
 
 create-ubuntu:
 	make clean-ubuntu
-	mvn clean package
+	mvn clean package -U
 	cp Vagrantfile ubuntu/Vagrantfile
 	cp run ubuntu/run	
 	cp -R target ubuntu/target
@@ -20,7 +20,7 @@ rmi-ubuntu:
 
 create-centos:
 	make clean-centos
-	mvn clean package
+	mvn clean package -U
 	cp Vagrantfile centos/Vagrantfile
 	cp run centos/run
 	cp -R target centos/target
