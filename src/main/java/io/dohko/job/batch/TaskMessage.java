@@ -19,9 +19,11 @@ package io.dohko.job.batch;
 import java.util.Date;
 
 import org.excalibur.core.execution.domain.TaskStatusType;
+import com.fasterxml.jackson.annotation.JsonFormat;
 
 public class TaskMessage {
 	private String taskId;
+	private String jobId;
 	private String taskName;
 	private TaskStatusType status;
 	private String output;
@@ -82,6 +84,14 @@ public class TaskMessage {
 	@Override
 	public String toString() {
 		return "TaskMessage [status=" + status.getName() + ", output=" + output + "]";
+	}
+
+	public String getJobId() {
+		return jobId;
+	}
+
+	public void setJobId(String jobId) {
+		this.jobId = jobId;
 	}
 	
 }

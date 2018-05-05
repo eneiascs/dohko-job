@@ -20,6 +20,7 @@ import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -36,6 +37,7 @@ import org.excalibur.core.execution.domain.TaskOutput;
 import org.excalibur.core.execution.domain.TaskOutputType;
 import org.excalibur.core.execution.domain.TaskStats;
 import org.excalibur.core.execution.domain.TaskStatus;
+import org.excalibur.core.execution.domain.TaskStatusType;
 import org.excalibur.core.execution.domain.repository.BlockRepository;
 import org.excalibur.core.execution.domain.repository.JobRepository;
 import org.excalibur.core.execution.domain.repository.TaskCpuStatsRepository;
@@ -86,6 +88,7 @@ import static org.apache.commons.io.FilenameUtils.*;
 
 import static org.excalibur.core.util.Instants.*;
 import static org.excalibur.core.execution.domain.TaskStatus.*;
+import static org.excalibur.core.execution.domain.TaskStatusType.CANCELLED;
 
 @Service
 public class JobService {
@@ -337,8 +340,9 @@ public class JobService {
 	@Subscribe
 	public void createTaskStatus(final TaskStatus status) {
 		if (status != null) {
-			taskStatusRepository.insert(status);			
+			taskStatusRepository.insert(status);
 		}
+		
 	}
 
 	@Subscribe
@@ -360,8 +364,10 @@ public class JobService {
 
 	@Subscribe
 	public void notifyTaskOutput(TaskMessage message) {
+		LOG.info("TaskName:{} TaskId: {} Status: {}",message.getTaskName(),message.getTaskId(),message.getStatus());
 		if (message != null) {
-		
+			Application task=taskRepository.findByUUID(message.getTaskId());
+			message.setJobId(task.getJobId());
 			notificationService.notify(message);
 		}
 	}

@@ -168,9 +168,11 @@ public class StepExecutor {
 		StepExecutionResult result = new StepExecutionResult(step);
 
 		LOG.info("Cancelling task [{},{}] ", step.getId(), step.getName());
-
-		eventBus.post(newTaskStatus(step.id(), step.name(), CANCELLED));
-
+		
+		TaskStatus cancelledStatus = newTaskStatus(step.id(), step.name(), CANCELLED);
+		eventBus.post(cancelledStatus);
+		eventBus.post(new TaskMessage(cancelledStatus.getTaskId(),cancelledStatus.getTaskName(),cancelledStatus.getType(),null,cancelledStatus.getDate()));
+		
 		return result;
 	}
 }
