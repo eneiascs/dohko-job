@@ -161,7 +161,15 @@ public class StepExecutor {
 	
 	private boolean isError(final String output) {
 		
-		return !"0".equals(getExitCode(output));
+		return !"0".equals(getExitCode(output))||containsTerminationReason(output);
+	}
+
+	private boolean containsTerminationReason(String output) {
+		final String exitcodeRegex = "terminationreason= *([A-z]*)";
+		final Pattern exitcodePattern = Pattern.compile(exitcodeRegex);
+		final Matcher exitcodeMatcher = exitcodePattern.matcher(output);
+		
+		return exitcodeMatcher.find();
 	}
 
 	public StepExecutionResult cancel() {
